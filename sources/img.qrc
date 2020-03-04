@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="image">
+    <file>flatwhite/add_bottom.png</file>
+    <file>flatwhite/app.ico</file>
+    <file>flatwhite/arrow-left.svg</file>
+  </qresource>
+</RCC>

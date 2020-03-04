@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>789</width>
+    <height>676</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Form</string>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,0,0,0,0,0,0,0,0,6,0,4,1">
+     <item>
+      <widget class="QPushButton" name="pushButton_5">
+       <property name="text">
+        <string/>
+       </property>
+       <property name="icon">
+        <iconset>
+         <normaloff>../../Users/fqk12/Desktop/工作/ocr/arrow-left.svg</normaloff>../../Users/fqk12/Desktop/工作/ocr/arrow-left.svg</iconset>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label">
+       <property name="text">
+        <string>操作:</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QComboBox" name="comboBox">
+       <item>
+        <property name="text">
+         <string>聚合</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>全集</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>交集</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>左集</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>右集</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>分割</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>替换</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>提取</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton">
+       <property name="text">
+        <string>帮助</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_2">
+       <property name="text">
+        <string>重置</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_3">
+       <property name="text">
+        <string>添加</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_6">
+       <property name="text">
+        <string>减少</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="pushButton_4">
+       <property name="text">
+        <string>执行</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="horizontalSpacer">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit">
+       <property name="font">
+        <font>
+         <weight>75</weight>
+         <bold>true</bold>
+         <strikeout>false</strikeout>
+        </font>
+       </property>
+       <property name="inputMethodHints">
+        <set>Qt::ImhNone</set>
+       </property>
+       <property name="dragEnabled">
+        <bool>false</bool>
+       </property>
+       <property name="placeholderText">
+        <string>正则表达式支持</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>替换</string>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QLineEdit" name="lineEdit_2"/>
+     </item>
+     <item>
+      <widget class="QComboBox" name="comboBox_2">
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+       <item>
+        <property name="text">
+         <string>-1</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>1</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>2</string>
+        </property>
+       </item>
+      </widget>
+     </item>
+    </layout>
+   </item>
+   <item>
+    <widget class="QSplitter" name="splitter_2">
+     <property name="orientation">
+      <enum>Qt::Vertical</enum>
+     </property>
+     <property name="opaqueResize">
+      <bool>true</bool>
+     </property>
+     <property name="handleWidth">
+      <number>5</number>
+     </property>
+     <property name="childrenCollapsible">
+      <bool>true</bool>
+     </property>
+     <widget class="QSplitter" name="splitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <widget class="QTextEdit" name="textEdit"/>
+      <widget class="QTextEdit" name="textEdit_2"/>
+     </widget>
+     <widget class="QTextBrowser" name="textBrowser">
+      <property name="font">
+       <font>
+        <weight>75</weight>
+        <bold>true</bold>
+       </font>
+      </property>
+      <property name="cursor" stdset="0">
+       <cursorShape>IBeamCursor</cursorShape>
+      </property>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources>
+  <include location="img.qrc"/>
+ </resources>
+ <connections>
+  <connection>
+   <sender>pushButton</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>helpSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>174</x>
+     <y>22</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>173</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_2</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>resetSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>260</x>
+     <y>20</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>279</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_4</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>startSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>501</x>
+     <y>35</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>446</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_3</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>addSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>333</x>
+     <y>25</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>343</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_5</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>backSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>25</x>
+     <y>23</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>24</x>
+     <y>0</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>pushButton_6</sender>
+   <signal>clicked()</signal>
+   <receiver>Form</receiver>
+   <slot>subSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>396</x>
+     <y>23</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>399</x>
+     <y>-32</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>helpSlot()</slot>
+  <slot>resetSlot()</slot>
+  <slot>startSlot()</slot>
+  <slot>addSlot()</slot>
+  <slot>backSlot()</slot>
+  <slot>subSlot()</slot>
+ </slots>
+</ui>

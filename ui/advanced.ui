@@ -1,0 +1,482 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="windowModality">
+   <enum>Qt::ApplicationModal</enum>
+  </property>
+  <property name="enabled">
+   <bool>true</bool>
+  </property>
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>304</width>
+    <height>623</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>高级</string>
+  </property>
+  <property name="toolTip">
+   <string extracomment="呵呵"/>
+  </property>
+  <property name="modal">
+   <bool>false</bool>
+  </property>
+  <layout class="QVBoxLayout" name="verticalLayout">
+   <item>
+    <widget class="QLabel" name="label_login">
+     <property name="text">
+      <string>登录</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_login">
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QFormLayout" name="formLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="login_label_id">
+        <property name="text">
+         <string>账号名</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="login_lineEdit_id"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="login_label_key">
+        <property name="text">
+         <string>账户密码</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="login_lineEdit_key"/>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="login_label_secret">
+        <property name="text">
+         <string>账户密钥</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLineEdit" name="login_lineEdit_secret">
+        <property name="echoMode">
+         <enum>QLineEdit::Password</enum>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_reg">
+     <property name="text">
+      <string>识别</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_reg">
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_3">
+      <item row="0" column="0">
+       <widget class="QLabel" name="reg_label_lay">
+        <property name="text">
+         <string>识别间隔:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1" colspan="2">
+       <widget class="QTimeEdit" name="reg_timeEdit">
+        <property name="currentSection">
+         <enum>QDateTimeEdit::SecondSection</enum>
+        </property>
+        <property name="displayFormat">
+         <string>s秒</string>
+        </property>
+        <property name="time">
+         <time>
+          <hour>0</hour>
+          <minute>0</minute>
+          <second>2</second>
+         </time>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="reg_label_num">
+        <property name="text">
+         <string>识别数量:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="reg_comboBox">
+        <property name="editable">
+         <bool>true</bool>
+        </property>
+        <item>
+         <property name="text">
+          <string>所有</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>1</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>2</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>3</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-1</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-2</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>-3</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QPushButton" name="reg_pushButton">
+        <property name="text">
+         <string>帮助</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="reg_label_debug">
+        <property name="text">
+         <string>识别模式:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QComboBox" name="comboBox">
+        <item>
+         <property name="text">
+          <string>精准识别</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>通用识别</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>手写识别</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_out">
+     <property name="text">
+      <string>导出</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_out">
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QGridLayout" name="gridLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="out_label_fmt">
+        <property name="text">
+         <string>导出格式:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="out_label_dir">
+        <property name="text">
+         <string>导出目录:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="out_lineEdit_dir"/>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLineEdit" name="out_lineEdit_title">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QComboBox" name="out_comboBox">
+        <item>
+         <property name="text">
+          <string>文本 txt</string>
+         </property>
+        </item>
+        <item>
+         <property name="text">
+          <string>Excel xlsx</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="out_label_title">
+        <property name="toolTip">
+         <string extracomment="呵呵"/>
+        </property>
+        <property name="whatsThis">
+         <string/>
+        </property>
+        <property name="text">
+         <string>标题设置:</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QLabel" name="label_advanced">
+     <property name="text">
+      <string>高级</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_advanced">
+     <property name="frameShape">
+      <enum>QFrame::Panel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <property name="leftMargin">
+       <number>10</number>
+      </property>
+      <property name="topMargin">
+       <number>10</number>
+      </property>
+      <item row="2" column="3">
+       <widget class="QPushButton" name="adv_pushButton_help">
+        <property name="text">
+         <string>帮助</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0" colspan="4">
+       <widget class="QListWidget" name="adv_listWidget">
+        <property name="enabled">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QCheckBox" name="adv_checkBox">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="adv_label_clean">
+        <property name="text">
+         <string>字段清洗:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="2">
+       <widget class="QPushButton" name="adv_pushButton_add">
+        <property name="text">
+         <string>添加</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="adv_label_region">
+        <property name="text">
+         <string>识别区域:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2" colspan="2">
+       <widget class="QLineEdit" name="adv_lineEdit"/>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QFrame" name="frame_set">
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="QPushButton" name="set_pushButton_reset">
+        <property name="text">
+         <string>重置</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="set_pushButton_apply">
+        <property name="text">
+         <string>应用</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections>
+  <connection>
+   <sender>set_pushButton_reset</sender>
+   <signal>clicked()</signal>
+   <receiver>Dialog</receiver>
+   <slot>set_resetSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>101</x>
+     <y>592</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>97</x>
+     <y>591</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>set_pushButton_apply</sender>
+   <signal>clicked()</signal>
+   <receiver>Dialog</receiver>
+   <slot>set_applySlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>226</x>
+     <y>592</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>223</x>
+     <y>591</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>out_comboBox</sender>
+   <signal>currentIndexChanged(int)</signal>
+   <receiver>Dialog</receiver>
+   <slot>out_fmtSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>177</x>
+     <y>294</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>303</x>
+     <y>383</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>reg_pushButton</sender>
+   <signal>clicked()</signal>
+   <receiver>Dialog</receiver>
+   <slot>reg_buttonSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>252</x>
+     <y>205</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>327</x>
+     <y>205</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>adv_pushButton_add</sender>
+   <signal>clicked()</signal>
+   <receiver>Dialog</receiver>
+   <slot>adv_buttonAddSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>149</x>
+     <y>415</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>-1</x>
+     <y>420</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>adv_pushButton_help</sender>
+   <signal>clicked()</signal>
+   <receiver>Dialog</receiver>
+   <slot>adv_buttonHelpSlot()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>234</x>
+     <y>413</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>374</x>
+     <y>418</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
+ <slots>
+  <slot>reg_buttonSlot()</slot>
+  <slot>out_fmtSlot()</slot>
+  <slot>set_resetSlot()</slot>
+  <slot>adv_buttonAddSlot()</slot>
+  <slot>set_applySlot()</slot>
+  <slot>adv_buttonHelpSlot()</slot>
+ </slots>
+</ui>
