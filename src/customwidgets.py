@@ -157,6 +157,9 @@ class Validpoints(QObject):
     def __getitem__(self, item):
         return self.__data[item]
 
+    def __repr__(self):
+        return f'Validpoints<{self.data}>'
+
 
 class ImgLabel(QLabel):
     action1_signal = pyqtSignal(dict)

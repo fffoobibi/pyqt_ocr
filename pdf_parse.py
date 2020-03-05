@@ -1,9 +1,18 @@
 import fitz
 from PIL import Image, ImageQt
-
+from PyQt5.QtGui import QPixmap, QImage
 pdf:fitz.Document = fitz.open('test.pdf')
-pix = pdf[0].getPixmap()
-for page in pdf:
-    pixmap = page.getPixmap()
-    print(pixmap.width,pixmap.height) 
+# help(pdf[0].getPixmap)
+# pix = pdf[0].getPixmap(fitz.Matrix(2, 2))
+# print(pix.width)
+
+
+pdf_pixmap = pdf[0].getPixmap(fitz.Matrix(2,2))
+pixmap = QPixmap.fromImage(
+    QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
+            pdf_pixmap.stride, pdf_pixmap.fmt))
+
+
+
+
     
