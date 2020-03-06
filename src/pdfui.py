@@ -9,17 +9,6 @@
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from customwidgets import DragLineEdit, ImgLabel, DragListWidget
-
-
-class PdfLineEdit(DragLineEdit):
-
-    def filterPolicy(self, event):
-        if event.mimeData().hasText():
-            path = event.mimeData().text()[-3:]
-            if path.lower() == 'pdf':
-                return True
-        return False
 
 class Ui_Form(object):
     def setupUi(self, Form):
@@ -39,10 +28,8 @@ class Ui_Form(object):
         self.listWidget.viewport().setProperty("cursor", QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.listWidget.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.listWidget.setDragEnabled(True)
-
-        # self.listWidget.setFlow(QtWidgets.QListView.TopToBottom)
-        # self.listWidget.setResizeMode(QtWidgets.QListView.Fixed)
-
+        self.listWidget.setFlow(QtWidgets.QListView.TopToBottom)
+        self.listWidget.setResizeMode(QtWidgets.QListView.Fixed)
         self.listWidget.setObjectName("listWidget")
         self.horizontalLayout_2.addWidget(self.listWidget)
         self.frame_2 = QtWidgets.QFrame(self.frame_3)
@@ -79,10 +66,16 @@ class Ui_Form(object):
         self.pushButton_2 = QtWidgets.QPushButton(self.frame)
         self.pushButton_2.setObjectName("pushButton_2")
         self.horizontalLayout.addWidget(self.pushButton_2)
-        self.label_3 = QtWidgets.QLabel(self.frame)
-        self.label_3.setObjectName("label_3")
-        self.horizontalLayout.addWidget(self.label_3)
+        self.lineEdit_2 = PageLineEdit(self.frame)
+        self.lineEdit_2.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
+        self.lineEdit_2.setObjectName("lineEdit_2")
+        self.horizontalLayout.addWidget(self.lineEdit_2)
+        self.label_2 = QtWidgets.QLabel(self.frame)
+        self.label_2.setObjectName("label_2")
+        self.horizontalLayout.addWidget(self.label_2)
         self.horizontalLayout.setStretch(1, 9)
+        self.horizontalLayout.setStretch(4, 1)
+        self.horizontalLayout.setStretch(5, 1)
         self.verticalLayout.addWidget(self.frame)
         self.frame_4 = QtWidgets.QFrame(self.frame_2)
         self.frame_4.setFrameShape(QtWidgets.QFrame.StyledPanel)
@@ -92,9 +85,9 @@ class Ui_Form(object):
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
         spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout_4.addItem(spacerItem)
-        self.label_2 = ImgLabel(self.frame_4)
-        self.label_2.setObjectName("label_2")
-        self.horizontalLayout_4.addWidget(self.label_2)
+        self.displayLabel = DisplayLabel(self.frame_4)
+        self.displayLabel.setObjectName("displayLabel")
+        self.horizontalLayout_4.addWidget(self.displayLabel)
         spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout_4.addItem(spacerItem1)
         self.verticalLayout.addWidget(self.frame_4)
@@ -115,5 +108,6 @@ class Ui_Form(object):
         self.label.setText(_translate("Form", "PDF"))
         self.pushButton.setText(_translate("Form", "浏览"))
         self.pushButton_2.setText(_translate("Form", "确认"))
-        self.label_3.setText(_translate("Form", "-1"))
-        self.label_2.setText(_translate("Form", "TextLabel"))
+        self.label_2.setText(_translate("Form", "-1"))
+        self.displayLabel.setText(_translate("Form", "TextLabel"))
+from customwidgets import DisplayLabel, DragListWidget, PageLineEdit, PdfLineEdit

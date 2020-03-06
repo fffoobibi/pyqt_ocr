@@ -1,9 +1,9 @@
 from sys import argv, exit
 from PIL import Image, ImageQt
 from fitz import open as pdf_open
+from fitz import Matrix
 from os.path import isfile, exists, isdir, abspath, join
 from os import listdir
-import fitz
 
 from PyQt5.QtWidgets import (QApplication, QWidget, QListWidgetItem,
                              QScrollBar, QVBoxLayout, QMessageBox, QLabel,
@@ -11,7 +11,11 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QListWidgetItem,
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, QSize, Qt
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen
 from pdfui import Ui_Form
-from customwidgets import ImgLabel, Validpoints
+from customwidgets import PreviewWidget
+
+
+class Widget(QWidget):
+    ...
 
 
 class EngineError(Exception):
@@ -24,9 +28,6 @@ class Engine(object):
         if isfile(path) and (path[-3:].lower() == 'pdf'):
             self.render = pdf_open(path)
             self.isPdf = True
-            pdf_pixmap = self.render[0].getPixmap(fitz.Matrix(2, 2))
-            self.fmt = QImage.Format_RGBA8888 if pdf_pixmap.alpha else QImage.Format_RGB888
-            self.stride = pdf_pixmap.stride
 
         elif exists(path) and isdir(path):
             self.render = path
@@ -45,16 +46,24 @@ class Engine(object):
                 ]
             else:
                 self.__pagesView = [
-                    abspath(join(self.dir, file)) for file in listdir(self.dir)
+                    abspath(join(self.target, file))
+                    for file in listdir(self.target)
                 ]
         return self.__pagesView
 
+    def pageCount(self):
+        if self.isPdf:
+            return self.render.pageCount
+        return len(listdir(self.target))
+
     def getPixmap(self, index, zoom=(1, 1)) -> QPixmap:
         if self.isPdf:
-            pdf_pixmap = self.render[index].getPixmap(fitz.Matrix(*zoom))
+            x, y = zoom
+            pdf_pixmap = self.render[index].getPixmap(Matrix(x, y))
+            fmt = QImage.Format_RGBA8888 if pdf_pixmap.alpha else QImage.Format_RGB888
             pixmap = QPixmap.fromImage(
                 QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
-                       self.stride, self.fmt))
+                       pdf_pixmap.stride, fmt))
             return pixmap
         else:
             return QPixmap(self.pagesView()[index])
@@ -66,29 +75,6 @@ class Engine(object):
         return f'Engine<{self.target}>'
 
 
-class PreviewLabel(ImgLabel):
-
-    clicked = pyqtSignal(int)
-
-    def __init__(self, *args, **kwargs):
-        index = kwargs.pop('index', 0)
-        super().__init__(*args, **kwargs)
-        self.index = index
-        self.setCursor(Qt.PointingHandCursor)
-
-    def mouseReleaseEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.clicked.emit(self.index)
-        super().mouseReleaseEvent(event)
-
-    def paintEvent(self, QPaintEvent):
-        self.setCursor(Qt.PointingHandCursor)
-        painter = QPainter()
-        painter.begin(self)
-        self.drawPolicy(painter)
-        painter.end()
-
-
 class PdfHandle(QObject):
 
     display_signal = pyqtSignal()
@@ -96,29 +82,34 @@ class PdfHandle(QObject):
     clear_signal = pyqtSignal()
     ocr_signal = pyqtSignal(list, list)
 
-    def __init__(self, root):
+    def __init__(self):
         super().__init__()
-        self.__scaledSize = None
+        self.__previewZoom = None
         self.__previewSize = None
+        self.__displayZoom = None
+        self.__displaySize = None
         self.__pageSize = None
         self.__screenSize = None
         self.__engine = None
-        self.zoom = (1, 1)
+
         self.engined_counts = 0
+        self.is_editing = False
         self.pixmaps = []
         self.pixmaps_points = []
         self.preview_pixmaps_points = []
         self.edited_pdfs = []
 
     def clear(self):
-        self.__scaledSize = None
+        self.__previewZoom = None
+        self.__displayZoom = None
+        self.__previewSize = None
         self.__pageSize = None
         self.__screenSize = None
-        self.__previewSize = None
-        # self.pixmaps.clear()
-        # self.pixmaps_points.clear()
+        self.is_editing = False
+        self.pixmaps.clear()
+        self.pixmaps_points.clear()
         # self.preview_pixmaps_points.clear()
-        # self.edited_pdfs.clear()
+        self.edited_pdfs.clear()
         self.clear_signal.emit()
 
     def setEngine(self, path):
@@ -131,11 +122,10 @@ class PdfHandle(QObject):
             self.__screenSize = desktop.width(), desktop.height()
         return self.__screenSize
 
-
     @property
     def pageSize(self) -> tuple:
         if self.__pageSize is None:
-            pix = self.__engine.getPixmap(0, self.zoom)
+            pix = self.__engine.getPixmap(index=0, zoom=(1, 1))
             self.__pageSize = pix.width(), pix.height()
         return self.__pageSize
 
@@ -144,56 +134,61 @@ class PdfHandle(QObject):
         if self.__previewSize is None:
             p_width, p_height = self.pageSize
             d_width, d_height = self.screenSize
-            zoom_width = d_width / 10
+            zoom_width = d_width / 12
             zoom_height = p_height / p_width * zoom_width
-            self.__previewSize = zoom_width, zoom_height
+            self.__previewSize = round(zoom_width, 0), round(zoom_height, 0)
         return self.__previewSize
 
-    
     @property
-    def autoScaledSize(self) -> tuple:
-        if self.__scaledSize is None:
+    def previewZoom(self) -> tuple:
+        if self.__previewZoom is None:
+            p_width, p_height = self.pageSize
+            width, height = self.previewSize
+            self.__previewZoom = width / p_width, width / p_width
+        return self.__previewZoom
+
+    @property
+    def displayZoom(self) -> tuple:
+        if self.__displayZoom is None:
             p_width, p_height = self.pageSize
             d_width, d_height = self.screenSize
             if (p_width, p_height) > (d_width, d_height):
-                scaled_x = max(p_width / d_width, p_height / d_height) 
-                self.__scaledSize = (p_width / scaled_x, p_height / scaled_x)
+                scaled_x = max(p_width / d_width, p_height / d_height) - 0.1
+                self.__displayZoom = scaled_x, scaled_x
             else:
-                self.__scaledSize = (p_width / p_height * d_height * 0.75,
-                                     d_height * 0.75)
-        return self.__scaledSize
+                self.__displayZoom = d_height * 0.8 / p_height, d_height * 0.8 / p_height
 
-    @autoScaledSize.setter
-    def autoScaledSize(self, qsize: tuple):
-        self.__scaledSize = qsize
+        return self.__displayZoom
+
+    @displayZoom.setter
+    def displayZoom(self, zoom: tuple):
+        self.__displayZoom = zoom
+
+    @property
+    def displaySize(self):
+        if self.__displaySize is None:
+            display_zoom = self.displayZoom[0]
+            p_width, p_height = self.pageSize
+            width, height = round(p_width * display_zoom,
+                                  0), round(p_height * display_zoom, 0)
+            self.__displaySize = width, height
+        return self.__displaySize
+
+    def pageCount(self):
+        return self.__engine.pageCount()
 
     def renderPixmap(self, index, zoom=(1, 1)) -> QPixmap:
         pixmap = self.__engine.getPixmap(index, zoom)
         return pixmap
 
-    def renderScaledPixmap(self,
-                           index,
-                           scaledSize: tuple = None,
-                           aspectRatioMode=Qt.IgnoreAspectRatio,
-                           transformMode=Qt.FastTransformation) -> QPixmap:
-        if scaledSize:
-            return self.renderPixmap(index).scaled(
-                *scaledSize,
-                aspectRatioMode=aspectRatioMode,
-                transformMode=transformMode)
-        return self.renderPixmap(index).scaled(*self.autoScaledSize,
-                                               aspectRatioMode=aspectRatioMode,
-                                               transformMode=transformMode)
-
     def rendering(self):
+        self.is_editing = True
         render_indexes = []
         for index in range(len(self.__engine.pagesView())):
             render_indexes.append(index)
 
         self.pixmaps = render_indexes
-        self.pixmaps_points = [
-            [[]] for points in range(len(self.pixmaps))
-        ]
+        self.pixmaps_points = [[[]] for points in range(len(self.pixmaps))]
 
     def open(self, path, parent_widget):
         self.engined_counts += 1
@@ -225,6 +220,7 @@ class PdfHandle(QObject):
                 self.setEngine(path)
                 self.rendering()
                 self.display_signal.emit()
+            parent_widget.displayLabel.show()
             self.thread().quit()
 
     def init(self):
@@ -247,7 +243,7 @@ class PdfWidget(Ui_Form, QWidget):
     def set_datas(self):
         self.reloaded = -1
         self._flag = 0
-        self.pdf_handle = PdfHandle(self)
+        self.pdf_handle = PdfHandle()
         self.pdf_thread = QThread()
         self.pdf_handle.moveToThread(self.pdf_thread)
         self.pdf_thread.started.connect(
@@ -255,12 +251,28 @@ class PdfWidget(Ui_Form, QWidget):
         self.pdf_handle.display_signal.connect(self.updateListWidget)
         self.pdf_handle.reload_signal.connect(self.reload)
         self.pdf_handle.clear_signal.connect(lambda: self.listWidget.clear())
-        self.label_2.points.points_signal.connect(self.updateListWidgetItem)
+        self.displayLabel.points.points_signal.connect(
+            self.updateListWidgetItem)
+        self.lineEdit_2.current_page.connect(self.jump)
+
+    def jump(self, index):
+        if self.pdf_handle.is_editing:
+            if index > (self.pdf_handle.pageCount() - 1):
+                index = self.pdf_handle.pageCount() - 1
+                self.listWidget.setCurrentRow(index)
+            else:
+                self.listWidget.setCurrentRow(index)
+            current = self.listWidget.currentItem()
+            widget = self.listWidget.itemWidget(current)
+            widget.preview_label.clicked.emit(index)
 
     def init(self):
         self.listWidget.itemClicked.connect(self.test)
         self.setStyleSheet(open('./sources/flatwhite.css').read())
         self.setWindowTitle('PDF')
+        self.label_2.setText('of 0')
+        self.lineEdit_2.setText('0')
+        self.displayLabel.hide()
 
     def reload(self):
         replay = QMessageBox.question(self, 'PDF', '确认重新加载pdf么?',
@@ -283,13 +295,11 @@ class PdfWidget(Ui_Form, QWidget):
         pass
 
     def updateListWidgetItem(self, points):
-        self.label_2.points.clear()
-        self.label_2.points.appends(points)
+        self.displayLabel.points.clear()
+        self.displayLabel.points.appends(points)
 
-        index = int(self.label_3.text()) - 1
-        # pix = self.pdf_handle.pixmaps[index]
-        # p_width, p_height = pix.width(), pix.height()
-        p_width, p_height = self.pdf_handle.autoScaledSize
+        index = int(self.lineEdit_2.text()) - 1
+        p_width, p_height = self.pdf_handle.displaySize
         width, height = self.pdf_handle.previewSize
         process = []
         for point in points:
@@ -312,45 +322,34 @@ class PdfWidget(Ui_Form, QWidget):
         preview_label.update()
 
     def get_item_widget(self, pixmap, index):
-        layout = QVBoxLayout()
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        widget = QWidget()
-        preview_label = PreviewLabel(index=index)
-        preview_label.setEdited(False)
-        widget.preview_label = preview_label
-
-        preview_label.setPixmap(pixmap)
-        preview_label.setEditPixmap(pixmap)
-        layout.addWidget(preview_label)
-        indexlabel = QLabel(str(index + 1))
-        indexlabel.setAlignment(Qt.AlignCenter)
-
-        preview_label.clicked.connect(self.displayPdfPage)
-        layout.addWidget(indexlabel)
-        widget.setLayout(layout)
+        shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
+        widget = PreviewWidget(index, pixmap, shadow_width)
+        widget.preview_label.clicked.connect(self.displayPdfPage)
+        widget.preview_label.setFixedSize(*self.pdf_handle.previewSize)
         return widget
 
     def updateListWidget(self):
-        preview_size = self.pdf_handle.previewSize
-        self.listWidget.setFixedWidth(preview_size[0] + 20)
-        display_pixmap = self.pdf_handle.renderScaledPixmap(
-            index=0, transformMode=Qt.SmoothTransformation)
-        self.label_3.setText('1')
-        self.label_2.setPixmap(display_pixmap)
-        self.label_2.setEditPixmap(display_pixmap)
-        self.label_2.setEdited(True)
+        shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
+        preview_width, preview_height = self.pdf_handle.previewSize
+        preview_zoom = self.pdf_handle.previewZoom
+        self.listWidget.setFixedWidth(preview_width + shadow_width * 2 + 10 * 2 + 20)
+        display_pixmap = self.pdf_handle.renderPixmap(
+            0, self.pdf_handle.displayZoom)
+
+        self.label_2.setText('of %s' % self.pdf_handle.pageCount())
+        self.lineEdit_2.setText('1')
+
+        self.displayLabel.setPixmap(display_pixmap)
+        self.displayLabel.setEditPixmap(display_pixmap)
+        self.displayLabel.setEdited(True)
 
         # 生成预览图
+        self.listWidget.setFixedSize
         for index in self.pdf_handle.pixmaps:
-            pix = self.pdf_handle.renderScaledPixmap(
-                index,
-                scaledSize=preview_size
-                # transformMode=Qt.SmoothTransformation)
+            pix = self.pdf_handle.renderPixmap(index, preview_zoom)
             item = QListWidgetItem()
             widget = self.get_item_widget(pix, index)
-            item.setSizeHint(QSize(*preview_size))
+            item.setSizeHint(QSize(preview_width + shadow_width * 2, preview_height +  shadow_width * 2 ))
             self.listWidget.addItem(item)
             self.listWidget.setItemWidget(item, widget)
             QApplication.processEvents()
@@ -358,17 +357,15 @@ class PdfWidget(Ui_Form, QWidget):
     def displayPdfPage(self, index):
         item = self.listWidget.currentItem()
         widget = self.listWidget.itemWidget(item)
-        print('preview_label', widget.preview_label.size(), self.pdf_handle.previewSize)
-        
-        page = self.pdf_handle.renderScaledPixmap(
-            index=index, transformMode=Qt.SmoothTransformation)
-        self.label_2.points.clear()
-        self.label_3.setText(str(index + 1))
-        self.label_2.setPixmap(page)
-        self.label_2.setEditPixmap(page)
-        self.label_2.points.appends(self.pdf_handle.pixmaps_points[index])
-        self.label_2.metedata = {'index': index}
-        self.label_2.update()
+        page = self.pdf_handle.renderPixmap(index=index,
+                                            zoom=self.pdf_handle.displayZoom)
+        self.displayLabel.points.clear()
+        self.lineEdit_2.setText(str(index + 1))
+        self.displayLabel.setPixmap(page)
+        self.displayLabel.setEditPixmap(page)
+        self.displayLabel.points.appends(self.pdf_handle.pixmaps_points[index])
+        self.displayLabel.metedata = {'index': index}
+        self.displayLabel.update()
 
     def openSlot(self):
         pass
@@ -377,7 +374,6 @@ class PdfWidget(Ui_Form, QWidget):
         pdf_file = self.lineEdit.text().strip('"').strip(' ')
         if exists(pdf_file):
             if pdf_file[-3:].lower() == 'pdf':
-                # self.engine_signal.emit(pdf_file, True)
                 self.pdf_thread.start()
         else:
             QMessageBox.warning(self, '警告', '打开正确的pdf文件')

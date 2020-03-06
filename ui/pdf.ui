@@ -36,7 +36,7 @@
        <number>0</number>
       </property>
       <item>
-       <widget class="QListWidget" name="listWidget">
+       <widget class="DragListWidget" name="listWidget">
         <property name="cursor" stdset="0">
          <cursorShape>PointingHandCursor</cursorShape>
         </property>
@@ -74,7 +74,7 @@
            <property name="frameShadow">
             <enum>QFrame::Raised</enum>
            </property>
-           <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,9,0,0,0">
+           <layout class="QHBoxLayout" name="horizontalLayout" stretch="0,9,0,0,1,1">
             <property name="leftMargin">
              <number>0</number>
             </property>
@@ -95,7 +95,7 @@
              </widget>
             </item>
             <item>
-             <widget class="QLineEdit" name="lineEdit">
+             <widget class="PdfLineEdit" name="lineEdit">
               <property name="font">
                <font>
                 <weight>75</weight>
@@ -131,7 +131,14 @@
              </widget>
             </item>
             <item>
-             <widget class="QLabel" name="label_3">
+             <widget class="PageLineEdit" name="lineEdit_2">
+              <property name="alignment">
+               <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="label_2">
               <property name="text">
                <string>-1</string>
               </property>
@@ -163,7 +170,7 @@
              </spacer>
             </item>
             <item>
-             <widget class="QLabel" name="label_2">
+             <widget class="DisplayLabel" name="displayLabel">
               <property name="text">
                <string>TextLabel</string>
               </property>
@@ -206,6 +213,28 @@
    </item>
   </layout>
  </widget>
+ <customwidgets>
+  <customwidget>
+   <class>DisplayLabel</class>
+   <extends>QLabel</extends>
+   <header location="global">customwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>DragListWidget</class>
+   <extends>QListWidget</extends>
+   <header location="global">customwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>PdfLineEdit</class>
+   <extends>QLineEdit</extends>
+   <header location="global">customwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>PageLineEdit</class>
+   <extends>QLineEdit</extends>
+   <header location="global">customwidgets</header>
+  </customwidget>
+ </customwidgets>
  <resources/>
  <connections>
   <connection>

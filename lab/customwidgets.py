@@ -1,9 +1,8 @@
 from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
-                             QListView, QListWidgetItem, QScrollBar,
-                             QHBoxLayout, QWidget)
-from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
-                         QPainterPath)
-from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF
+                             QListView, QListWidgetItem, QScrollBar)
+
+from PyQt5.QtGui import QPainter, QCursor, QPen, QDropEvent, QDragEnterEvent, QDrag, QIntValidator
+from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData
 
 
 class DragListWidget(QListWidget):
@@ -15,7 +14,6 @@ class DragListWidget(QListWidget):
         # self.setMovement(QListView.Free)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
-        self.setSpacing(10)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -41,9 +39,9 @@ class DragListWidget(QListWidget):
                     if widget:
                         self.removeItemWidget(self.drag_item)
                 elif action == Qt.CopyAction:
-                    pass
+                    print('copy')
                 else:
-                    pass
+                    print('cancle')
 
     def _renderItemWidget(self, row, qsize, widget):
         item = QListWidgetItem()
@@ -107,6 +105,7 @@ class DragLineEdit(QLineEdit):
         return False
 
     def dragEnterEvent(self, event):
+        print(event.source())
         if self.filterPolicy(event):
             event.accept()
         else:
@@ -200,7 +199,6 @@ class ImgLabel(QLabel):
         self.draw_pixmap = draw_pixmap
         self.points = Validpoints()
         self.metedata = {}
-        self.menu = QMenu(self)
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.contextMenu)
 
@@ -222,8 +220,8 @@ class ImgLabel(QLabel):
             self.update()
         elif action == a2:
             points = []
-            for xycoords in self.points.data:
-                x1, y1, x2, y2 = xycoords
+            for v in self.points.data:
+                x1, y1, x2, y2 = v
                 w, h = abs(x2 - x1), abs(y2 - y1)
                 if (x2 - x1) > 0 and (y2 - y1) > 0:
                     points.append([x1, y1, x2, y2])  # 右下方滑动
@@ -233,8 +231,10 @@ class ImgLabel(QLabel):
                     points.append([x2, y2 - h, x1, y1 + h])  # 左下方滑动
                 else:
                     points.append([x2, y2, x1, y1])  # 左上方滑动
+
             self.points.clear()
             self.points.appends(points)
+
             self.action2_signal.emit(self.metedata)
             self.points.points_signal.emit(points)
 
@@ -288,51 +288,7 @@ class ImgLabel(QLabel):
                 else:
                     painter.drawRect(x2, y1 - h, w, h)  # 左上方滑动
 
-
-# DisplayLabel = ImgLabel
-
-class DisplayLabel(ImgLabel):
-
-    def contextMenu(self, pos):
-        menu = QMenu(self)
-        a1 = menu.addAction('清除')
-        a2 = menu.addAction('确认')
-        a3 = menu.addAction('识别此页')
-        a4 = menu.addAction('识别此PDF') 
-        a5 = menu.addAction('导出此PDF')
-        action = menu.exec_(QCursor.pos())
-        if action == a1:
-            self.points.clear()
-            self.action1_signal.emit(self.metedata)
-            self.points.points_signal.emit([])
-            self.update()
-        elif action == a2:
-            points = []
-            for xycoords in self.points.data:
-                x1, y1, x2, y2 = xycoords
-                w, h = abs(x2 - x1), abs(y2 - y1)
-                if (x2 - x1) > 0 and (y2 - y1) > 0:
-                    points.append([x1, y1, x2, y2])  # 右下方滑动
-                elif (x2 - x1) > 0 and (y2 - y1) < 0:
-                    points.append([x1, y1 - h, x2, y2 + h])  # 右上方滑动
-                elif (x2 - x1) < 0 and (y2 - y1) > 0:
-                    points.append([x2, y2 - h, x1, y1 + h])  # 左下方滑动
-                else:
-                    points.append([x2, y2, x1, y1])  # 左上方滑动
-            self.points.clear()
-            self.points.appends(points)
-            self.action2_signal.emit(self.metedata)
-            self.points.points_signal.emit(points)
-
-        elif action == a3:
-            pass
-        elif action == a4:
-            pass
-        elif action == a5:
-            pass
-    
-
-class PreviewLabel(DisplayLabel):
+class PreviewLabel(ImgLabel):
 
     clicked = pyqtSignal(int)
 
@@ -343,62 +299,13 @@ class PreviewLabel(DisplayLabel):
         self.setCursor(Qt.PointingHandCursor)
 
     def mouseReleaseEvent(self, event):
-        super().mouseReleaseEvent(event)
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.index)
-
-    def drawPolicy(self, painter):
-        super().drawPolicy(painter)
-        painter.setPen(QPen(QColor(60,60,60,125), 4, Qt.SolidLine))
-        painter.drawRect(QRectF(self.rect()))
+        super().mouseReleaseEvent(event)
 
     def paintEvent(self, QPaintEvent):
         self.setCursor(Qt.PointingHandCursor)
         painter = QPainter()
         painter.begin(self)
         self.drawPolicy(painter)
-        painter.drawRect(QRectF(self.rect()))
         painter.end()
-
-
-class PreviewWidget(QWidget):
-    def __init__(self, index, pixmap, shadow=20):
-        super().__init__()
-        self.__enter = False
-        self.selected = False
-        self.shadow = shadow, shadow,shadow, shadow
-        self.preview_label = PreviewLabel(index=index)
-        self.preview_label.setScaledContents(True)
-        self.preview_label.setEdited(False)
-        self.preview_label.setPixmap(pixmap)
-        self.preview_label.setEditPixmap(pixmap)
-        self.layout = QHBoxLayout()
-        self.layout.setContentsMargins(*self.shadow)
-        self.layout.addWidget(self.preview_label)
-        self.setLayout(self.layout)
-
-    def paintEvent(self, event):
-        painter = QPainter()
-        painter.begin(self)
-        painter.setRenderHint(QPainter.Antialiasing, True)
-        self.drawPolicy(painter)
-        painter.end()
-
-    def drawPolicy(self, painter):
-        if self.__enter or self.selected:
-            path1 = QPainterPath()
-            path1.addRect(QRectF(self.rect()))
-            path2 = QPainterPath()
-            path2.addRect(QRectF(self.preview_label.geometry()))
-            painter.fillPath(path1 - path2, QColor(120, 120, 120, 80))
-            painter.drawPath(path2)
-
-    def enterEvent(self, event):
-        super().enterEvent(event)
-        self.__enter = True
-        self.update()
-
-    def leaveEvent(self, event):
-        super().leaveEvent(event)
-        self.__enter = False
-        self.update()
