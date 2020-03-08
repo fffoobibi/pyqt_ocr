@@ -1,0 +1,17 @@
+{
+    "user1": {
+        "id": "",
+        "key": "",
+        "secret": "",
+        "platform": "",
+        "settings": "这是一个测试",
+        "info": {
+            "activate": "user1",
+            "number": 1,
+            "hide": false,
+            "basic": 0,
+            "hand": 0,
+            "accurate": 0
+        }
+    }
+}

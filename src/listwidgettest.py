@@ -9,10 +9,10 @@ class Demo(QWidget):
     def __init__(self):
         super().__init__()
         self.resize(400, 800)
-        self.listwidget = DragListWidget(self)
-        self.listwidget.setGeometry(0, 0, 400, 800)
-        self.listwidget.addItems(list('12345'))
-        self.listwidget.setMovement(QListView.Free)
+        self.listwidget = QListWidget(self)
+        self.listwidget.setGeometry(0, 0, 400, 400)
+        self.listwidget.addItems(map(range(15, str)))
+        # self.listwidget.setMovement(QListView.Free)Q
 
         self.menu = QMenu()
         self.menu.addAction('test1')
