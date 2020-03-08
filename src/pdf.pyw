@@ -2,6 +2,7 @@ from sys import argv, exit
 from PIL import Image, ImageQt
 from fitz import open as pdf_open
 from fitz import Matrix
+from functools import wraps
 from os.path import isfile, exists, isdir, abspath, join
 from os import listdir
 
@@ -11,6 +12,7 @@ from PyQt5.QtWidgets import (QApplication, QWidget, QListWidgetItem,
 from PyQt5.QtCore import QThread, QObject, pyqtSignal, QSize, Qt
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen
 from pdfui import Ui_Form
+
 from customwidgets import PreviewWidget
 
 
@@ -73,10 +75,23 @@ class Engine(object):
 
 class PdfHandle(QObject):
 
+    open_signal = pyqtSignal()
     display_signal = pyqtSignal()
     reload_signal = pyqtSignal()
     clear_signal = pyqtSignal()
     ocr_signal = pyqtSignal(list, list)
+
+    @staticmethod
+    def slot(signal: str='', desc=''):
+        def outer(func):
+            @wraps(func)
+            def inner(self, *args, **kwargs):
+                res = func(self, *args, **kwargs)
+                return res
+
+            return inner
+
+        return outer
 
     def __init__(self):
         super().__init__()
@@ -87,6 +102,7 @@ class PdfHandle(QObject):
         self.__pageSize = None
         self.__screenSize = None
         self.__engine = None
+        self.__reload = False
 
         self.engined_counts = 0
         self.is_editing = False
@@ -96,17 +112,18 @@ class PdfHandle(QObject):
         self.edited_pdfs = []
 
     def clear(self):
-        self.__previewZoom = None
-        self.__displayZoom = None
-        self.__previewSize = None
-        self.__pageSize = None
-        self.__screenSize = None
-        self.is_editing = False
+        if not self.__reload:
+            self.__previewZoom = None
+            self.__displayZoom = None
+            self.__previewSize = None
+            self.__pageSize = None
+            self.__screenSize = None
+            self.is_editing = False
         self.pixmaps.clear()
         self.pixmaps_points.clear()
-        # self.preview_pixmaps_points.clear()
         self.edited_pdfs.clear()
         self.clear_signal.emit()
+        
 
     def setEngine(self, path):
         self.__engine = Engine(path)
@@ -199,34 +216,22 @@ class PdfHandle(QObject):
             flag = False
         finally:
             if flag:
-                self.reload_signal.emit()
-                # while True:
-                #     if parent_widget.reloaded == QMessageBox.Yes:
-                #         self.clear()
-                #         self.setEngine(path)
-                #         self.rendering()
-                #         self.display_signal.emit()
-                #         parent_widget.reloaded = -1
-                #         break
-                #     elif parent_widget.reloaded == QMessageBox.No:
-                #         parent_widget.reloaded = -1
-                #         break
-
+                self.reload_signal.emit()  # 阻塞
                 if parent_widget.reloaded == QMessageBox.Yes:
+                    self.__reload = True
                     self.clear()
                     self.setEngine(path)
                     self.rendering()
                     self.display_signal.emit()
+                    self.__reload = False
                     parent_widget.reloaded = -1
                 elif parent_widget.reloaded == QMessageBox.No:
                     parent_widget.reloaded = -1
-
             else:
                 self.clear()
                 self.setEngine(path)
                 self.rendering()
                 self.display_signal.emit()
-            # self.thread().quit()
 
     def init(self):
         pass
@@ -253,11 +258,11 @@ class PdfWidget(Ui_Form, QWidget):
         self.pdf_thread = QThread()
         self.pdf_handle.moveToThread(self.pdf_thread)
 
-        self.pdf_thread.started.connect(
-            lambda: self.pdf_handle.open(self._file(), self))
-        
         self.pdf_thread.finished.connect(self.pdf_handle.deleteLater)
         self.pdf_handle.destroyed.connect(self.pdf_thread.deleteLater)
+
+        self.pdf_handle.open_signal.connect(
+            lambda: self.pdf_handle.open(self._file(), self))
 
         self.pdf_handle.display_signal.connect(self.updateListWidget)
         self.pdf_handle.reload_signal.connect(self.reload)
@@ -285,12 +290,14 @@ class PdfWidget(Ui_Form, QWidget):
         self.lineEdit_2.setText('0')
         self.displayLabel.hide()
 
+    @PdfHandle.slot(signal='reload_signal')
     def reload(self):
         replay = QMessageBox.question(self, 'PDF', '确认重新加载pdf么?',
                                       QMessageBox.Yes | QMessageBox.No,
                                       QMessageBox.No)
         self.reloaded = replay
 
+    @PdfHandle.slot(desc='run in pdf_thread')
     def updateListWidgetItem(self, points):
         self.displayLabel.points.clear()
         self.displayLabel.points.appends(points)
@@ -316,6 +323,7 @@ class PdfWidget(Ui_Form, QWidget):
         preview_label.points.appends(process)
         preview_label.update()
 
+    @PdfHandle.slot(desc='run in pdf_thread')
     def get_item_widget(self, pixmap, index):
         shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
         widget = PreviewWidget(index, pixmap, shadow_width)
@@ -323,21 +331,19 @@ class PdfWidget(Ui_Form, QWidget):
         widget.preview_label.setFixedSize(*self.pdf_handle.previewSize)
         return widget
 
-    def updateListWidget(self):
-        print('update', QThread.currentThreadId())
+    @PdfHandle.slot(signal='display_signal')
+    def updateListWidget(self):  # 槽函数
         shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
-        print('update2', QThread.currentThreadId())
         preview_width, preview_height = self.pdf_handle.previewSize
-        print('update3', QThread.currentThreadId())
         preview_zoom = self.pdf_handle.previewZoom
-        print('update4', QThread.currentThreadId())
-    
-        display_pixmap = self.pdf_handle.renderPixmap(0, self.pdf_handle.displayZoom)
+        display_pixmap = self.pdf_handle.renderPixmap(
+            0, self.pdf_handle.displayZoom)
 
         self.label_2.setText('of %s' % self.pdf_handle.pageCount())
         self.lineEdit_2.setText('1')
 
-        self.listWidget.setFixedWidth(preview_width + shadow_width * 2 + 10 * 2 + 20)
+        self.listWidget.setFixedWidth(preview_width + shadow_width * 2 +
+                                      10 * 2 + 20)
         self.displayLabel.setPixmap(display_pixmap)
         self.displayLabel.setEdit(True)
         self.displayLabel.show()
@@ -345,7 +351,6 @@ class PdfWidget(Ui_Form, QWidget):
         # 生成预览图
         self.listWidget.indexes = self.pdf_handle.pixmaps
         for index in self.pdf_handle.pixmaps:
-            print('render:', QThread.currentThreadId())
             pix = self.pdf_handle.renderPixmap(index, preview_zoom)
             item = QListWidgetItem()
             widget = self.get_item_widget(pix, index)
@@ -356,7 +361,7 @@ class PdfWidget(Ui_Form, QWidget):
             self.listWidget.setItemWidget(item, widget)
             QApplication.processEvents()
 
-
+    @PdfHandle.slot(desc='run in pdf_thread')
     def displayPdfPage(self, index):
         item = self.listWidget.currentItem()
         row = self.listWidget.currentRow()
@@ -373,11 +378,11 @@ class PdfWidget(Ui_Form, QWidget):
         pass
 
     def confirmSlot(self):
-        pdf_file = self.lineEdit.text().strip('"').strip(' ')
+        pdf_file = self._file()
         if exists(pdf_file):
             if pdf_file[-3:].lower() == 'pdf':
                 self.pdf_thread.start()
-                # self.pdf_handle.open(pdf_file, self)
+                self.pdf_handle.open_signal.emit()
         else:
             QMessageBox.warning(self, '警告', '打开正确的pdf文件')
 

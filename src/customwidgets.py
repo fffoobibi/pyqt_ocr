@@ -613,6 +613,7 @@ class PdfHandle(QObject):
     def init(self):
         pass
 
+
 class ResultsHandle():
     def __init__(self, platform='b'):
         self.platform = platform
@@ -626,9 +627,10 @@ class ResultsHandle():
         else:
             return results, False
 
+
 class OcrHandle(QObject):
 
-    signal = pyqtSignal(str)
+    ocr_signal = pyqtSignal(object)
 
     def __init__(self):
         super().__init__()
@@ -641,7 +643,6 @@ class OcrHandle(QObject):
             self.baidu(user)
         else:
             pass
-        self.thread().quit()
 
     def baidu(self, user:User):
         config: Config = user.config
