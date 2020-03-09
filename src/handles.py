@@ -241,3 +241,6 @@ class OcrHandle(QObject):
                 else:
                     self.signal.emit(str(json))
                 self.thread().msleep(delay)
+            else:
+                for index in self.use_pdf_handle.pixmaps:
+                    pass

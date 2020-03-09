@@ -1,0 +1,9 @@
+<RCC>
+  <qresource prefix="image">
+    <file>img/app.ico</file>
+    <file>img/arrow-left.svg</file>
+    <file>img/indent-decrease.svg</file>
+    <file>img/indent-increase.svg</file>
+    <file>img/add_bottom.png</file>
+  </qresource>
+</RCC>

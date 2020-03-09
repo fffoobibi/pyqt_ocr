@@ -2,12 +2,12 @@ import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+from srcui import Ui_Form
 
-class Widget(QWidget):
+class Widget(Ui_Form, QWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.frame = QFrame(self)
-        self.radio = QRadioButton(self.frame)
+        self.setupUi(self)
         
 
 def main():

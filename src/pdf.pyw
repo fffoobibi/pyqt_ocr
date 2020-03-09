@@ -5,15 +5,46 @@ from fitz import Matrix
 from functools import wraps
 from os.path import isfile, exists, isdir, abspath, join
 from os import listdir
+from math import sqrt
 
-from PyQt5.QtWidgets import (QApplication, QWidget, QListWidgetItem,
+from PyQt5.QtWidgets import (QApplication, QWidget, QListWidgetItem, QGraphicsOpacityEffect,
                              QScrollBar, QVBoxLayout, QMessageBox, QLabel,
                              QListView)
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, QSize, Qt
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen
+from PyQt5.QtCore import QThread, QObject, pyqtSignal, QSize, Qt, QPropertyAnimation, QRect, QCoreApplication
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QIcon
 from pdfui import Ui_Form
 
 from customwidgets import PreviewWidget
+
+g_dpi = 0
+g_width = 0
+g_height = 0
+
+
+def dpi(w_r, h_r, w, h):
+    global g_dpi, g_width, g_height
+    if g_dpi == 0:
+        g_width = w
+        g_height = h
+        g_dpi = sqrt(w**2 + h**2) / sqrt((w_r / 10 * 0.394)**2 +
+                                         (h_r / 10 * 0.394)**2)
+    return g_dpi
+
+
+class InitDpi(QWidget):
+    def __init__(self, parent=None, app=None):
+        super().__init__(parent)
+        desktop = QApplication.desktop()
+        screen_rect = desktop.screenGeometry()
+        height = screen_rect.height()
+        width = screen_rect.width()
+        dpi(desktop.widthMM(), desktop.heightMM(), width, height)
+        font = QFont("宋体")
+        font.setPixelSize(
+            11 *
+            (g_dpi / 96))  # CurrentFontSize *（DevelopmentDPI / CurrentFontDPI）
+        app.setFont(font)
+        self.close()
 
 
 class EngineError(Exception):
@@ -82,7 +113,7 @@ class PdfHandle(QObject):
     ocr_signal = pyqtSignal(list, list)
 
     @staticmethod
-    def slot(signal: str='', desc=''):
+    def slot(signal: str = '', desc=''):
         def outer(func):
             @wraps(func)
             def inner(self, *args, **kwargs):
@@ -123,7 +154,6 @@ class PdfHandle(QObject):
         self.pixmaps_points.clear()
         self.edited_pdfs.clear()
         self.clear_signal.emit()
-        
 
     def setEngine(self, path):
         self.__engine = Engine(path)
@@ -257,6 +287,10 @@ class PdfWidget(Ui_Form, QWidget):
         self.pdf_handle = PdfHandle()
         self.pdf_thread = QThread()
         self.pdf_handle.moveToThread(self.pdf_thread)
+        self.radioButton.setText('22')
+        self.radioButton.showMaximized()
+        # self.radioButton.setChecked(True)
+        self.radioButton.setFixedHeight(30)
 
         self.pdf_thread.finished.connect(self.pdf_handle.deleteLater)
         self.pdf_handle.destroyed.connect(self.pdf_thread.deleteLater)
@@ -345,6 +379,7 @@ class PdfWidget(Ui_Form, QWidget):
         self.listWidget.setFixedWidth(preview_width + shadow_width * 2 +
                                       10 * 2 + 20)
         self.displayLabel.setPixmap(display_pixmap)
+        self.displayLabel.setEditPixmap(display_pixmap)
         self.displayLabel.setEdit(True)
         self.displayLabel.show()
 
@@ -360,6 +395,8 @@ class PdfWidget(Ui_Form, QWidget):
             self.listWidget.addItem(item)
             self.listWidget.setItemWidget(item, widget)
             QApplication.processEvents()
+
+        self.listWidget.setCurrentRow(0)
 
     @PdfHandle.slot(desc='run in pdf_thread')
     def displayPdfPage(self, index):
@@ -386,11 +423,54 @@ class PdfWidget(Ui_Form, QWidget):
         else:
             QMessageBox.warning(self, '警告', '打开正确的pdf文件')
 
+    def leftAnSlot(self):
+        rect = self.listWidget.geometry()
+        self.animL = QPropertyAnimation(self.listWidget,
+                                        b'geometry')  
+        self.animL.setDuration(200) 
+        if self.pushButton_4.isChecked():
+            self.animL.setStartValue(rect)  
+            self.animL.setEndValue(QRect(-rect.width(), rect.y(), rect.width(),
+                                     rect.height()))  
+        else:
+            self.animL.setStartValue(rect)  
+            self.animL.setEndValue(QRect(0, rect.y(), rect.width(),
+                                     rect.height()))  
+        self.animL.start()
+        if self.pushButton_4.isChecked():
+            self.pushButton_4.setIcon(QIcon(":/image/img/indent-increase.svg"))
+        else:
+            self.pushButton_4.setIcon(QIcon(":/image/img/indent-decrease.svg"))
+
+    def rightAnSlot(self):
+        rect = self.textBrowser.geometry()
+        self.anim = QPropertyAnimation(self.textBrowser,
+                                       b'geometry')  # 设置动画的对象及其属性
+        self.anim.setDuration(300)  # 设置动画间隔时间
+        if self.pushButton_3.isChecked():
+            self.anim.setStartValue(rect)  # 设置动画对象的起始属性
+            self.anim.setEndValue(
+                QRect(self.width(), rect.y(), rect.width(),
+                      rect.height()))  # 设置动画对象的结束属性
+        else:
+            self.anim.setStartValue(rect)
+            self.anim.setEndValue(
+                QRect(0, rect.y(), rect.width(),
+                      rect.height()))
+            self.textBrowser.show()
+        self.anim.start()  # 启动动画
+        if self.pushButton_3.isChecked():
+            self.pushButton_3.setIcon(QIcon(":/image/img/indent-decrease.svg"))
+        else:
+            self.pushButton_3.setIcon(QIcon(":/image/img/indent-increase.svg"))
+
 
 def main():
+    # QCoreApplication.setAttribute(Qt.AA_DisableHighDpiScaling)
     app = QApplication(argv)
+    # InitDpi(app=app)
     pdfwidget = PdfWidget()
-    pdfwidget.show()
+    pdfwidget.showMaximized()
     exit(app.exec_())
 
 

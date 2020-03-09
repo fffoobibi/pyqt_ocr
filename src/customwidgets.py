@@ -2,13 +2,14 @@ from configparser import ConfigParser
 from os.path import exists, join, expanduser, isfile, abspath, isdir
 
 from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
-                             QListWidgetItem, QHBoxLayout, QWidget)
-from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator, QPixmap, 
-                         QFont, QPainterPath)
+                             QListView, QListWidgetItem, QHBoxLayout, QWidget)
+from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
+                         QPixmap, QFont, QPainterPath, QDrag, QDragEnterEvent)
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF
 
 from ruia_ocr import (BaiduOcrService, get_file_paths, BAIDU_ACCURATE_TYPE,
                       BAIDU_GENERAL_TYPE, BAIDU_HANDWRITING_TYPE)
+from fitz import open as pdf_open
 from supports import Account, User, Config
 
 
@@ -18,8 +19,9 @@ class DragListWidget(QListWidget):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setAcceptDrops(True)
-        self.setDragEnabled(True)
+        # self.setAcceptDrops(True)
+        # self.setDragEnabled(True)
+        self.setMovement(QListView.Free)
         self.setSpacing(10)
         self.indexes = []
 
@@ -59,9 +61,13 @@ class DragListWidget(QListWidget):
             self.insertItem(row, item)
         self.setItemWidget(item, widget)
 
-    def dragEnterEvent(self, QDragEnterEvent):
-        QDragEnterEvent.setDropAction(Qt.MoveAction)
-        QDragEnterEvent.accept()
+    def dragEnterEvent(self, QDragEnterEvent: QDragEnterEvent):
+        if self.drag_item:
+            if QDragEnterEvent.source():
+                QDragEnterEvent.setDropAction(Qt.MoveAction)
+                QDragEnterEvent.accept()
+        else:
+            QDragEnterEvent.ignore()
 
     def dragMoveEvent(self, QDragMoveEvent):
         QDragMoveEvent.setDropAction(Qt.MoveAction)
@@ -415,12 +421,20 @@ class Engine(object):
         if isfile(path) and (path[-3:].lower() == 'pdf'):
             self.render = pdf_open(path)
             self.isPdf = True
+            self.isdir = False
+            self.isfile = False
 
         elif exists(path) and isdir(path):
             self.render = path
             self.isPdf = False
-        else:
-            raise EngineError('渲染异常')
+            self.isdir = True
+            self.isfile = False
+        elif isfile(path) and (path[-4:].lower in [
+                '.png', '.bmp', '.jpg', 'jpeg'
+        ]):
+            self.isfile = True
+            self.isPdf = False
+            self.isdir = False
         self.__pagesView = None
         self.target = path
 
@@ -431,17 +445,19 @@ class Engine(object):
                     'Page_%s' % page
                     for page in range(1, self.render.pageCount + 1)
                 ]
-            else:
+            elif self.isdir:
                 self.__pagesView = [
                     abspath(join(self.target, file))
                     for file in listdir(self.target)
                 ]
+            else:
+                self.__pagesView = [self.target]
         return self.__pagesView
 
     def pageCount(self):
         if self.isPdf:
             return self.render.pageCount
-        return len(listdir(self.target))
+        return len(self.pagesView())
 
     def getPixmap(self, index, zoom=(1, 1)) -> QPixmap:
         if self.isPdf:
@@ -495,7 +511,6 @@ class PdfHandle(QObject):
         self.is_editing = False
         self.pixmaps.clear()
         self.pixmaps_points.clear()
-        # self.preview_pixmaps_points.clear()
         self.edited_pdfs.clear()
         self.clear_signal.emit()
 
@@ -509,28 +524,37 @@ class PdfHandle(QObject):
             self.__screenSize = desktop.width(), desktop.height()
         return self.__screenSize
 
-    @property
-    def pageSize(self) -> tuple:
+    def pageSizes(self) -> list:
         if self.__pageSize is None:
-            pix = self.__engine.getPixmap(index=0, zoom=(1, 1))
-            self.__pageSize = pix.width(), pix.height()
+            if self.__engine.isPdf:
+                pix = self.__engine.getPixmap(index=0, zoom=(1, 1))
+                self.__pageSize = [(pix.width(), pix.height()) for i in range(self.pageCount())]
+            elif self.__engine.isfile:
+                pix = self.__engine.getPixmap(index=0)
+                self.__pageSize = [(pix.width(), pix.height())]
+            else:
+                page_size = []
+                for index in range(self.pageCount()):
+                    pix = self.__engine.getPixmap(index=index)
+                    page_size.append((pix.width(), pix.height()))
+                self.__pageSize = page_size
         return self.__pageSize
 
-    @property
-    def previewSize(self) -> tuple:
+    
+    def previewSize(self, index) -> tuple:
         if self.__previewSize is None:
-            p_width, p_height = self.pageSize
+            p_width, p_height = self.pageSizes()[index]
             d_width, d_height = self.screenSize
             zoom_width = d_width / 12
             zoom_height = p_height / p_width * zoom_width
             self.__previewSize = round(zoom_width, 0), round(zoom_height, 0)
         return self.__previewSize
 
-    @property
-    def previewZoom(self) -> tuple:
+
+    def previewZoom(self, index) -> tuple:
         if self.__previewZoom is None:
-            p_width, p_height = self.pageSize
-            width, height = self.previewSize
+            p_width, p_height = self.pageSizes()[index]
+            width, height = self.previewSize(index)
             self.__previewZoom = width / p_width, width / p_width
         return self.__previewZoom
 
@@ -635,7 +659,7 @@ class OcrHandle(QObject):
     def __init__(self):
         super().__init__()
         self.use_pdf_handle = False
-        self.result_handle =  ResultsHandle()
+        self.result_handle = ResultsHandle()
 
     def ocr(self, user: User):
         platform = user.platform
@@ -644,7 +668,7 @@ class OcrHandle(QObject):
         else:
             pass
 
-    def baidu(self, user:User):
+    def baidu(self, user: User):
         config: Config = user.config
         if user.legal:
             starts = config.get('parseinfo', 'workpath')
@@ -657,14 +681,19 @@ class OcrHandle(QObject):
             if not self.use_pdf_handle:
                 if service == '0':
                     service_type = BAIDU_GENERAL_TYPE
-                elif service== '1':
+                elif service == '1':
                     service_type = BAIDU_ACCURATE_TYPE
                 else:
                     service_type = BAIDU_HANDWRITING_TYPE
-                ocr_service = BaiduOcrService(user.id, user.key, user.secret, service_type, seq='\n')
+                ocr_service = BaiduOcrService(user.id,
+                                              user.key,
+                                              user.secret,
+                                              service_type,
+                                              seq='\n')
 
                 self.signal.emit(
-                    f'<p style="font-weight:bold;color:purple">[{info_time()}] {basename(path)}:</p>')
+                    f'<p style="font-weight:bold;color:purple">[{info_time()}] {basename(path)}:</p>'
+                )
 
                 json = ocr_service.request(region=region, image_path=starts)
                 res, flag = self.result_handle.process(json)
