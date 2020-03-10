@@ -6,7 +6,16 @@ from copy import deepcopy
 
 import json
 
-__all__ = ['DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User']
+Size = Tuple[int, int]
+Zoom = Tuple[float, float]
+RectCoord = List[int] # [x1,y1,x2,y2]
+RectCoords = List[RectCoord]  # [[x1,y1,x2,y2], [x2,y3,x4,y4], ...]
+Region = 'x1,y1,x2,y2;...'
+
+__all__ = [
+    'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size',
+    'Zoom', 'RectCoord', 'RectCoords', 'Region'
+]
 
 home = abspath(expanduser('~\\Desktop')) if exists(
     abspath(expanduser('~\\Desktop'))) else abspath(expanduser('~'))

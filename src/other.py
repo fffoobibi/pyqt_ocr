@@ -140,7 +140,7 @@ class Analysis(QObject):
         self.thread().quit()
 
 
-class Other(QWidget, Ui_Form):
+class AnalysisWidget(QWidget, Ui_Form):
 
     backsig = pyqtSignal()
 
@@ -283,7 +283,7 @@ class Other(QWidget, Ui_Form):
 
 def main():
     app = QApplication(argv)
-    win = Other()
+    win = AnalysisWidget()
     win.show()
     exit(app.exec_())
 

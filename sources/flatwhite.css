@@ -282,7 +282,7 @@ QTimeEdit::down-button:pressed, QDateEdit::down-button:pressed, QDateTimeEdit::d
 }
 
 QComboBox::down-arrow, QDateEdit[calendarPopup="true"]::down-arrow, QTimeEdit[calendarPopup="true"]::down-arrow, QDateTimeEdit[calendarPopup="true"]::down-arrow {
-    image: url(:/image/flatwhite/add_bottom.png);
+    image: url(:/image/img/add_bottom.png);
     width: 10px;
     height: 10px;
     right: 2px;

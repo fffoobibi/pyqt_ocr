@@ -22,8 +22,8 @@
         <string/>
        </property>
        <property name="icon">
-        <iconset>
-         <normaloff>../../Users/fqk12/Desktop/工作/ocr/arrow-left.svg</normaloff>../../Users/fqk12/Desktop/工作/ocr/arrow-left.svg</iconset>
+        <iconset resource="src.qrc">
+         <normaloff>:/image/img/arrow-left.svg</normaloff>:/image/img/arrow-left.svg</iconset>
        </property>
       </widget>
      </item>
@@ -217,7 +217,7 @@
   </layout>
  </widget>
  <resources>
-  <include location="img.qrc"/>
+  <include location="src.qrc"/>
  </resources>
  <connections>
   <connection>
@@ -259,7 +259,7 @@
    <slot>startSlot()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>501</x>
+     <x>597</x>
      <y>35</y>
     </hint>
     <hint type="destinationlabel">
@@ -275,8 +275,8 @@
    <slot>addSlot()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>333</x>
-     <y>25</y>
+     <x>417</x>
+     <y>35</y>
     </hint>
     <hint type="destinationlabel">
      <x>343</x>
@@ -307,8 +307,8 @@
    <slot>subSlot()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>396</x>
-     <y>23</y>
+     <x>507</x>
+     <y>34</y>
     </hint>
     <hint type="destinationlabel">
      <x>399</x>

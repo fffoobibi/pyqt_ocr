@@ -8,7 +8,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from sources import *
+from srcs import *
 
 
 
@@ -23,7 +23,7 @@ class Ui_Form(object):
         self.pushButton_5 = QtWidgets.QPushButton(Form)
         self.pushButton_5.setText("")
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/image/flatwhite/arrow-left.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/image/arrow-left.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButton_5.setIcon(icon)
         self.pushButton_5.setObjectName("pushButton_5")
         self.horizontalLayout.addWidget(self.pushButton_5)
