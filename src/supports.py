@@ -1,20 +1,21 @@
+import json
+
 from typing import *
 from configparser import ConfigParser
 from os.path import exists, join, expanduser, isfile, abspath
 from aip import AipOcr
 from copy import deepcopy
-
-import json
+from functools import wraps
 
 Size = Tuple[int, int]
 Zoom = Tuple[float, float]
-RectCoord = List[int] # [x1,y1,x2,y2]
+RectCoord = List[int]  # [x1,y1,x2,y2]
 RectCoords = List[RectCoord]  # [[x1,y1,x2,y2], [x2,y3,x4,y4], ...]
 Region = 'x1,y1,x2,y2;...'
 
 __all__ = [
     'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size',
-    'Zoom', 'RectCoord', 'RectCoords', 'Region'
+    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot'
 ]
 
 home = abspath(expanduser('~\\Desktop')) if exists(
@@ -41,10 +42,14 @@ DEFAULT_SETTINGS = {
         'basic': 0,
         'handwriting': 0,
         'accurate': 0,
+    },
+    'temporal': {
+        'ocr_image': [],
+        'rect_coords': []
     }
 }
 
-personal_config = deepcopy(DEFAULT_SETTINGS)
+__personal_config = deepcopy(DEFAULT_SETTINGS)
 
 ACCOUNT_SETTINGS = {
     'user1': {
@@ -54,7 +59,7 @@ ACCOUNT_SETTINGS = {
         'platform': 'b',
         'alias': 'user1',
         'legal': False,
-        'config': personal_config
+        'config': __personal_config
     },
     'info': {
         'active': 'user1',
@@ -67,171 +72,116 @@ ACCOUNT_SETTINGS = {
 }
 
 
+def slot(signal='', sender='', desc=''):
+    def outer(func):
+        @wraps(func)
+        def inner(*args, **kwargs):
+            res = func(*args, **kwargs)
+            return res
+
+        return inner
+
+    return outer
+
+
 class Config(object):
     @classmethod
     def fromDict(self, dic):
         return Config(from_dict=dic)
 
     def __init__(self, from_file=True, *, from_dict=False):
-        self.__cp = ConfigParser()
-
+        cp = ConfigParser()
         if from_dict:
-            self.__cp.read_dict(from_dict)
-            self.__from_dict = True
-            self.__dict_data = deepcopy(from_dict)
+            self.info = from_dict
         else:
             self.__from_dict = False
             self._file_path = abspath(join(expanduser('~'), 'ocr_app.cfg'))
             if not exists(self._file_path):
-                self.__cp.read_dict(DEFAULT_SETTINGS)
+                dft = DEFAULT_SETTINGS.copy()
+                dft.pop('temporal')
+                self.info = dft
                 with open(self._file_path, 'w') as file:
-                    self.__cp.write(file)
+                    cp.write(file)
             else:
-                self.__cp.read(self._file_path)
+                dic = {}
+                for key, section in cp.items():
+                    if key != 'DEFAULT':
+                        dic[key] = dict(section)
+                self.info = dic
 
     def to_dict(self) -> dict:
-        dic = {}
-        for key, section in self.__cp.items():
-            if key != 'DEFAULT':
-                dic[key] = dict(section)
-        return dic
+        return self.info
 
     def update_from_dict(self, dic):
-        cfgs = self.to_dict()
-        cfgs.update(dic)
-        self.__cp.clear()
-        self.__cp.read_dict(cfgs)
+        self.info.update(dic)
 
-    def options(self):
-        return self.__cp.sections()
-
-    def reload(self):
-        self.__cp.clear()
-        if not self.__from_dict:
-            self.__cp.read(self._file_path)
-        else:
-            self.__cp.read_dict(self.__dict_data)
+    def pop(self, section):
+        self.info.pop(section, None)
 
     def get(self, section: str, key: str, parse=str) -> str:
-        return parse(self.__cp.get(section, key))
+        return parse(self.info[section][key])
 
     def set(self, section, key, v):
-        self.__cp.set(section, key, v)
+        self.info.set(section, key, v)
 
     def flush(self) -> bool:
         dic = self.to_dict()
-        return self.save(dic)
+        dic.pop('temporal', None)
+        return self.__save(dic)
 
-    def save(self, dic) -> bool:
+    def __save(self, dic) -> bool:
         if not self.__from_dict:
-            with open(self.file_path, 'w') as file:
-                self.__cp.clear()
-                self.__cp.read_dict(dic)
-                self.__cp.write(file)
+            cp = ConfigParser()
+            with open(self._file_path, 'w') as file:
+                cp.read_dict(self.info)
+                cp.write(file)
             return True
         return False
+
+    def __repr__(self):
+        return self.to_dict()
 
 
 DEFAULT_CONFIG = Config.fromDict(DEFAULT_SETTINGS)
 
 
-class User():
-    @classmethod
-    def fromDict(self, dic):
-        id = dic['id']
-        key = dic['key']
-        secret = dic['secret']
-        platform = dic['platform']
-        alias = dic['alias']
-        legal = dic['legal']
-        config = Config.fromDict(dic['config'])
-        return User(id, key, secret, alias, platform, legal, config)
-
-    def __init__(self,
-                 id,
-                 key,
-                 secret,
-                 alias,
-                 platform='b',
-                 legal=False,
-                 config: Config = DEFAULT_CONFIG):
-        self.id = id
-        self.key = key
-        self.secret = secret
-        self.alias = alias
-        self.platform = platform
-        self.config = config
-        self.__legal = legal
-
-    @property
-    def legal(self) -> bool:
-        if self.platform == 'b':
-            if self.__legal == False:
-                from aip import AipOcr
-                img = open('./checkUser.png').read()
-                client = AipOcr(self.id, self.key, self.secret)
-                res = client.basicGeneral(img)
-                if res.get('error_code', None) == 14:
-                    self.__legal = False
-                else:
-                    self.__legal = True
-                return self.__legal
-
-    def set_config(self, config: Config):
-        self.config = config
-
-    def to_dict(self) -> Dict:
-        return {
-            'id': self.id,
-            'key': self.key,
-            'secret': self.secret,
-            'alias': self.alias,
-            'platform': self.platform,
-            'legal': self.legal,
-            'config': self.config.to_dict()
-        }
-
-    def __repr__(self):
-        return f'User<alias:{self.alias}, ...>'
-
-
-class Account():
+class Account(object):
     def __init__(self):
         self.file_path = abspath(join(expanduser('~'), 'ocr_user.json'))
+        self.reload()
+
+    def reload(self):
         if not exists(self.file_path):
             with open(self.file_path, 'w+', encoding='utf8') as file:
                 json.dump(ACCOUNT_SETTINGS,
                           file,
                           ensure_ascii=False,
                           indent='  ')
+        self.info = json.load(open(self.file_path, 'r', encoding='utf8'))
 
-        self.info: Dict = json.load(open(self.file_path, 'r', encoding='utf8'))
-        self._user_length = len(self.info.keys()) - 1
-
-    def add_user(self, user: User):
+    def add_user(self, user: 'User'):
         if user.alias in self.info.keys():
-            _user = User.fromDict(self.info[user.alias])
-            dic = _user.to_dict()
-            dic.update(user.to_dict())
-            self.info.update(dic)
+            di = {user.alias: user.to_dict()}
+            self.info.update(di)
         else:
-            self._user_length += 1
-            self.info.update({f'user{self._user_length}': user.to_dict()})
+            self.info.update({f'{user.alias}': user.to_dict()})
 
-    def save(self):
-        with open(self.file_path, 'w+', encoding='utf8') as file:
-            json.dump(self.info, file)
-
-    def users(self) -> List[User]:
+    def users(self) -> List['User']:
         lis = []
-        for key, value in self.info:
+        for key, value in self.info.items():
             if key != 'info':
                 lis.append(User.fromDict(value))
         return lis
 
-    def active_user(self) -> User:
-        active = self.info.get(self.info['info']['active'])
-        return User.fromDict(active)
+    def alias(self) -> List:
+        return [key for key in self.info if key != 'info']
+
+    def active_alias(self) -> str:
+        return self.info['info']['active']
+
+    def active_user(self) -> 'User':
+        user = User.fromDict(self.info[self.active_alias()])
+        return user
 
     def active_config(self) -> Config:
         user = self.active_user()
@@ -250,3 +200,80 @@ class Account():
     def flush(self):
         with open(self.file_path, 'w+', encoding='utf8') as file:
             json.dump(self.info, file, ensure_ascii=False, indent='  ')
+
+
+class User(object):
+    __users__ = []
+
+    @classmethod
+    def fromDict(cls, dic):
+        id = dic['id']
+        key = dic['key']
+        secret = dic['secret']
+        platform = dic['platform']
+        alias = dic['alias']
+        for user in cls.__users__:
+            if all([
+                    id == user.id, key == user.key, secret == user.key,
+                    platform == user.platform, alias == user.alias
+            ]):
+                return user
+        else:
+            legal = dic['legal']
+            config = Config.fromDict(dic['config'])
+            return User(id, key, secret, alias, platform, legal, config)
+
+    def __init__(self,
+                 id,
+                 key,
+                 secret,
+                 alias,
+                 platform='b',
+                 legal=False,
+                 config: Config = DEFAULT_CONFIG):
+        self.id = id
+        self.key = key
+        self.secret = secret
+        self.alias = alias
+        self.platform = platform
+        self.config = config
+        self.__legal = legal
+        self.__users__.append(self)
+
+    @property
+    def legal(self) -> bool:
+        if self.platform == 'b':
+            if self.__legal == False:
+                from aip import AipOcr
+                img = open('./checkUser.png').read()
+                client = AipOcr(self.id, self.key, self.secret)
+                res = client.basicGeneral(img)
+                if res.get('error_code', None) == 14:
+                    self.__legal = False
+                else:
+                    self.__legal = True
+            return self.__legal
+
+    def set_config(self, config: Config):
+        self.config = config
+
+    def sync(self, account: Account):
+        self.config.pop('temporal')
+        account.add_user(self)
+        # account.flush()
+
+    def to_dict(self) -> Dict:
+        config = self.config.to_dict()
+        config.pop('temporal', None)
+        return {
+            'id': self.id,
+            'key': self.key,
+            'secret': self.secret,
+            'alias': self.alias,
+            'platform': self.platform,
+            'legal': self.__legal,
+            'config': config
+        }
+
+    def __repr__(self):
+        return f'User<alias:{self.alias}, ...>'

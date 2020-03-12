@@ -1,5 +1,15 @@
 <RCC>
   <qresource prefix="image">
+    <file>img/checkbox_checked.png</file>
+    <file>img/checkbox_checked_disable.png</file>
+    <file>img/checkbox_parcial.png</file>
+    <file>img/checkbox_parcial_disable.png</file>
+    <file>img/checkbox_unchecked.png</file>
+    <file>img/checkbox_unchecked_disable.png</file>
+    <file>img/radiobutton_unchecked.png</file>
+    <file>img/radiobutton_checked.png</file>
+    <file>img/radiobutton_checked_disable.png</file>
+    <file>img/radiobutton_unchecked_disable.png</file>
     <file>img/app.ico</file>
     <file>img/arrow-left.svg</file>
     <file>img/indent-decrease.svg</file>

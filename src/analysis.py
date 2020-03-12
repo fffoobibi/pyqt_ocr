@@ -6,7 +6,7 @@ from jinja2 import Template
 from PyQt5.QtWidgets import QWidget, QApplication, QTextEdit, QMenu
 from PyQt5.QtCore import QObject, QThread, pyqtSignal, Qt
 from PyQt5.QtGui import QCursor, QIntValidator
-from otherui import Ui_Form
+from analysisui import Ui_Form
 
 
 class Analysis(QObject):

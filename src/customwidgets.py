@@ -1,14 +1,16 @@
+from PIL import ImageQt
 from configparser import ConfigParser
 from os.path import exists, join, expanduser, isfile, abspath, isdir
 
-from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
+from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,QApplication,
                              QListView, QListWidgetItem, QHBoxLayout, QWidget)
 from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
                          QPixmap, QFont, QPainterPath, QDrag, QDragEnterEvent)
-from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF
+from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread
 
 from ruia_ocr import (BaiduOcrService, get_file_paths, BAIDU_ACCURATE_TYPE,
                       BAIDU_GENERAL_TYPE, BAIDU_HANDWRITING_TYPE)
+
 from fitz import open as pdf_open
 from supports import Account, User, Config
 
@@ -136,8 +138,8 @@ class DragLineEdit(QLineEdit):
 class PdfLineEdit(DragLineEdit):
     def filterPolicy(self, event):
         if event.mimeData().hasText():
-            path = event.mimeData().text()[-3:]
-            if path.lower() == 'pdf':
+            path = event.mimeData().text()[-4:]
+            if path.lower() in ['.pdf', '.png', '.jpg', '.jpeg', '.bmp']:
                 return True
         return False
 
@@ -302,6 +304,15 @@ class ImgLabel(QLabel):
 
 
 class DisplayLabel(ImgLabel):
+    def __init__(self, *args, **kwargs):
+        padfwidget = kwargs.pop('pdfwidget', None)
+        super().__init__(*args, **kwargs)
+        self.__pdfwidget = padfwidget
+        self.metedata = {'index': -1}
+
+    def getPdfWidget(self):
+        return self.__pdfwidget
+
     def contextMenu(self, pos):
         menu = QMenu(self)
         a1 = menu.addAction('清除')
@@ -332,7 +343,22 @@ class DisplayLabel(ImgLabel):
             self.points.points_signal.emit(points)
 
         elif action == a3:
-            pass
+            print(111)
+            print(QThread.currentThreadId())
+            pdfwidget = self.getPdfWidget()
+            activeuser = pdfwidget.account.active_user()
+            activeuser.config.update_from_dict({
+                'parseinfo': {
+                    'workpath': pdfwidget._work_path(),
+                    'basic': 0,
+                    'handwriting': 0,
+                    'accurate': 0
+                }
+            })
+            pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
+            print(QThread.currentThreadId())
+            print(222)
+            
         elif action == a4:
             pass
         elif action == a5:

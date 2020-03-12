@@ -1,6 +1,7 @@
 import datetime
 
 from functools import wraps
+from datetime import datetime
 from typing import List, NoReturn
 
 from PIL import Image, ImageQt
@@ -8,7 +9,7 @@ from fitz import Matrix
 from fitz import open as pdf_open
 from os.path import isfile, exists, isdir, abspath, join, basename
 
-from PyQt5.QtCore import QObject, pyqtSignal
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QThread
 from PyQt5.QtWidgets import QMessageBox, QApplication
 from PyQt5.QtGui import QPixmap, QImage
 
@@ -20,6 +21,16 @@ save_name = lambda: datetime.now().strftime('%Y%m%d_%H_%M_%S')
 
 __all__ = ['PdfHandle', 'OcrHandle', 'ResultHandle']
 
+class BaseHandle(QObject):
+    @staticmethod
+    def slot(signal: str = '', desc='', sender=''):
+        def outer(func):
+            @wraps(func)
+            def inner(self, *args, **kwargs):
+                res = func(self, *args, **kwargs)
+                return res
+            return inner
+        return outer
 
 class Engine(object):
     def __init__(self, path):
@@ -86,25 +97,13 @@ class Engine(object):
         return f'Engine<{self.target}>'
 
 
-class PdfHandle(QObject):
+class PdfHandle(BaseHandle):
 
     open_signal = pyqtSignal()
     display_signal = pyqtSignal()
     reload_signal = pyqtSignal()
     clear_signal = pyqtSignal()
     ocr_signal = pyqtSignal(list, list)
-
-    @staticmethod
-    def slot(signal: str = '', desc=''):
-        def outer(func):
-            @wraps(func)
-            def inner(self, *args, **kwargs):
-                res = func(self, *args, **kwargs)
-                return res
-
-            return inner
-
-        return outer
 
     def __init__(self):
         super().__init__()
@@ -114,6 +113,7 @@ class PdfHandle(QObject):
         self.reload = QMessageBox.No
         self.engined_counts = 0
         self.is_editing = False
+        self.available_screen = True
 
         self.pixmaps = []
         self.pixmaps_points = []
@@ -129,8 +129,6 @@ class PdfHandle(QObject):
         self.__pageSizes: list = None
 
     def clear(self):
-        # if self.reload == QMessageBox.Yes:
-
         self.__previewZooms: list = None
         self.__displayZooms: list = None
         self.__pageSizes: list = None
@@ -158,7 +156,11 @@ class PdfHandle(QObject):
     def screenSize(self) -> Size:
         if self.__screenSize is None:
             desktop = QApplication.desktop()
-            self.__screenSize = desktop.width(), desktop.height()
+            if self.available_screen:
+                rect = desktop.availableGeometry()
+                self.__screenSize = rect.width(), rect.height()
+            else:
+                self.__screenSize = desktop.width(), desktop.height()  
         return self.__screenSize
 
     def pageSizes(self) -> List[Size]:
@@ -306,6 +308,9 @@ class PdfHandle(QObject):
     def init(self):
         pass
 
+    def __repr__(self):
+        return f'PdfHandle<{self.__engine}>'
+
 
 class ResultsHandle():
     def __init__(self, platform='b'):
@@ -321,15 +326,16 @@ class ResultsHandle():
             return results, False
 
 
-class OcrHandle(QObject):
-
-    ocr_signal = pyqtSignal(object)
+class OcrHandle(BaseHandle):
+    ocr_signal = pyqtSignal(User)
+    results_signal = pyqtSignal(object)
 
     def __init__(self, pdf_handle: PdfHandle):
         super().__init__()
         self.pdf_handle = pdf_handle
         self.result_handle = ResultsHandle()
 
+    @slot(signal='ocr_signal', sender='self')
     def ocr(self, user: User):
         platform = user.platform
         if platform == 'b':
@@ -341,7 +347,7 @@ class OcrHandle(QObject):
         region = ''
         for rect_coord in points:
             region += ','.join(map(str, rect_coord)) + ';'
-        return region
+        return region.strip(';')
 
     def baidu(self, user: User):
         config: Config = user.config
@@ -350,9 +356,6 @@ class OcrHandle(QObject):
             service = config.get('recognition', 'type')
             number = config.get('recognition', 'number')
             delay = int(config.get('recognition', 'delay')) * 1000
-
-            _region = config.get('advanced', 'region')
-            region = None if _region == 'none' else _region
             if service == '0':
                 service_type = BAIDU_GENERAL_TYPE
             elif service == '1':
@@ -362,17 +365,23 @@ class OcrHandle(QObject):
 
             ocr_service = BaiduOcrService(user.id, user.key, user.secret, service_type, seq='\n')
 
-            if self.pdf_handle.getEngine().render_type == 'file':   
-                self.signal.emit(
+            if self.pdf_handle.getEngine().render_type == 'file':  
+                region = self._parse_to_region(self.pdf_handle.pixmaps_points[0])
+
+                self.results_signal.emit(
                     f'<p style="font-weight:bold;color:purple">[{info_time()}] {basename(workpath)}:</p>'
                 )
 
                 json = ocr_service.request(region=region, image_path=workpath)
+                self.thread().sleep(2)
+                print('baidu')
+                print(QThread.currentThreadId())
                 res, flag = self.result_handle.process(json)
+                print(res)
                 if flag:
-                    self.signal.emit('<p>%s</p>' % '\n'.join(res))
+                    self.results_signal.emit('<p>%s</p>' % '\n'.join(res))
                 else:
-                    self.signal.emit(str(json))
+                    self.results_signal.emit(str(json))
 
             else:
                 for index, points in enumerate(self.pdf_handle.pixmaps):
@@ -385,7 +394,7 @@ class OcrHandle(QObject):
                     json = ocr_service.request(region=region, img=img)
                     res, flag = self.result_handle.process(json)
                     if flag:
-                        self.signal.emit('<p>%s</p>' % '\n'.join(res))
+                        self.results_signal.emit('<p>%s</p>' % '\n'.join(res))
                     else:
-                        self.signal.emit(str(json))
+                        self.results_signal.emit(str(json))
                     self.thread().msleep(delay)

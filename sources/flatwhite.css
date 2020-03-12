@@ -211,19 +211,19 @@ QRadioButton::indicator {
 }
 
 QRadioButton::indicator::unchecked {
-    image: url(./flatwhite/radiobutton_unchecked.png);
+    image: url(:/image/img/radiobutton_unchecked.png);
 }
 
 QRadioButton::indicator::unchecked:disabled {
-    image: url(./flatwhite/radiobutton_unchecked_disable.png);
+    image: url(:/image/img/radiobutton_unchecked_disable.png);
 }
 
 QRadioButton::indicator::checked {
-    image: url(./flatwhite/radiobutton_checked.png);
+    image: url(:/image/img/radiobutton_checked.png);
 }
 
 QRadioButton::indicator::checked:disabled {
-    image: url(./flatwhite/radiobutton_checked_disable.png);
+    image: url(:/image/img/radiobutton_checked_disable.png);
 }
 
 QGroupBox::indicator, QTreeWidget::indicator, QListWidget::indicator {
@@ -236,27 +236,27 @@ QCheckBox::indicator, QGroupBox::indicator, QTreeWidget::indicator, QListWidget:
 }
 
 QCheckBox::indicator:unchecked, QGroupBox::indicator:unchecked, QTreeWidget::indicator:unchecked, QListWidget::indicator:unchecked {
-    image: url(./flatwhite/checkbox_unchecked.png);
+    image: url(:/image/img/checkbox_unchecked.png);
 }
 
 QCheckBox::indicator:unchecked:disabled, QGroupBox::indicator:unchecked:disabled, QTreeWidget::indicator:unchecked:disabled, QListWidget::indicator:disabled {
-    image: url(./flatwhite/checkbox_unchecked_disable.png);
+    image: url(:/image/img/checkbox_unchecked_disable.png);
 }
 
 QCheckBox::indicator:checked, QGroupBox::indicator:checked, QTreeWidget::indicator:checked, QListWidget::indicator:checked {
-    image: url(./flatwhite/checkbox_checked.png);
+    image: url(:/image/img/checkbox_checked.png);
 }
 
 QCheckBox::indicator:checked:disabled, QGroupBox::indicator:checked:disabled, QTreeWidget::indicator:checked:disabled, QListWidget::indicator:checked:disabled {
-    image: url(./flatwhite/checkbox_checked_disable.png);
+    image: url(:/image/img/checkbox_checked_disable.png);
 }
 
 QCheckBox::indicator:indeterminate, QGroupBox::indicator:indeterminate, QTreeWidget::indicator:indeterminate, QListWidget::indicator:indeterminate {
-    image: url(./flatwhite/checkbox_parcial.png);
+    image: url(:/image/img/checkbox_parcial.png);
 }
 
 QCheckBox::indicator:indeterminate:disabled, QGroupBox::indicator:indeterminate:disabled, QTreeWidget::indicator:indeterminate:disabled, QListWidget::indicator:indeterminate:disabled {
-    image: url(./flatwhite/checkbox_parcial_disable.png);
+    image: url(:/image/img/checkbox_parcial_disable.png);
 }
 
 QTimeEdit::up-button, QDateEdit::up-button, QDateTimeEdit::up-button, QDoubleSpinBox::up-button, QSpinBox::up-button {

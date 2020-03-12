@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'untitled.ui'
+# Form implementation generated from reading ui file 'analysis.ui'
 #
 # Created by: PyQt5 UI code generator 5.13.0
 #
@@ -8,14 +8,12 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-from srcs import *
-
 
 
 class Ui_Form(object):
     def setupUi(self, Form):
         Form.setObjectName("Form")
-        Form.resize(783, 676)
+        Form.resize(789, 676)
         self.verticalLayout = QtWidgets.QVBoxLayout(Form)
         self.verticalLayout.setObjectName("verticalLayout")
         self.horizontalLayout = QtWidgets.QHBoxLayout()
@@ -23,7 +21,7 @@ class Ui_Form(object):
         self.pushButton_5 = QtWidgets.QPushButton(Form)
         self.pushButton_5.setText("")
         icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/image/arrow-left.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon.addPixmap(QtGui.QPixmap(":/image/img/arrow-left.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.pushButton_5.setIcon(icon)
         self.pushButton_5.setObjectName("pushButton_5")
         self.horizontalLayout.addWidget(self.pushButton_5)
@@ -72,11 +70,6 @@ class Ui_Form(object):
         self.label_2.setObjectName("label_2")
         self.horizontalLayout.addWidget(self.label_2)
         self.lineEdit_2 = QtWidgets.QLineEdit(Form)
-        font = QtGui.QFont()
-        font.setBold(True)
-        font.setWeight(75)
-        self.lineEdit_2.setFont(font)
-        self.lineEdit_2.setPlaceholderText("")
         self.lineEdit_2.setObjectName("lineEdit_2")
         self.horizontalLayout.addWidget(self.lineEdit_2)
         self.comboBox_2 = QtWidgets.QComboBox(Form)
@@ -87,7 +80,7 @@ class Ui_Form(object):
         self.comboBox_2.addItem("")
         self.horizontalLayout.addWidget(self.comboBox_2)
         self.horizontalLayout.setStretch(9, 6)
-        self.horizontalLayout.setStretch(11, 5)
+        self.horizontalLayout.setStretch(11, 4)
         self.horizontalLayout.setStretch(12, 1)
         self.verticalLayout.addLayout(self.horizontalLayout)
         self.splitter_2 = QtWidgets.QSplitter(Form)
@@ -143,3 +136,4 @@ class Ui_Form(object):
         self.comboBox_2.setItemText(0, _translate("Form", "-1"))
         self.comboBox_2.setItemText(1, _translate("Form", "1"))
         self.comboBox_2.setItemText(2, _translate("Form", "2"))
+from srcs import *

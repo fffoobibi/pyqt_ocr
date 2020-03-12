@@ -1,22 +1,13 @@
-from sys import argv, exit
-from PIL import Image, ImageQt
-from fitz import open as pdf_open
-from fitz import Matrix
-from functools import wraps
-from os.path import isfile, exists, isdir, abspath, join
-from os import listdir
-from math import sqrt
+import sys
+from PyQt5.QtWidgets import *
+from PyQt5.QtGui import *
+from PyQt5.QtCore import *
 
-from PyQt5.QtWidgets import (QApplication, QWidget, QListWidgetItem, QGraphicsOpacityEffect,
-                             QScrollBar, QVBoxLayout, QMessageBox, QLabel,
-                             QListView)
-from PyQt5.QtCore import QThread, QObject, pyqtSignal, QSize, Qt, QPropertyAnimation, QRect, QCoreApplication
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen, QFont, QIcon
-from pdfui import Ui_Form
-
+from os.path import isdir, exists
+from pdfuinew import Ui_Form
+from handles import PdfHandle, OcrHandle
 from customwidgets import PreviewWidget
-from supports import *
-from typing import List, NoReturn
+from supports import slot
 
 
 class PdfWidget(Ui_Form, QWidget):
@@ -24,40 +15,49 @@ class PdfWidget(Ui_Form, QWidget):
     engine_signal = pyqtSignal(str, bool)
 
     def __init__(self, *args, **kwargs):
+        account = kwargs.pop('account', None)
         super().__init__(*args, **kwargs)
         self.setupUi(self)
-        self.init()
         self.set_datas()
-        print('init', QThread.currentThreadId())
+        self.init()
+        self.account = account
 
     def _work_path(self):
         return self.lineEdit.text().strip('"').strip(' ')
 
     def set_datas(self):
-        self.reloaded = -1
-        self._flag = 0
+        '''
+        在QT5中，信号可以连接到一切可以调用的对象上，包括普通函数，成员函数，函数对象，lambda表达式；
+        总的来说，信号与槽的连接有两种方式：1、直接连接 2、队列连接；默认的自动连接下，如果发射信号的线程
+        （而不是发送者所在的线程）与接受者所驻足的线程相同，则是队列连接；
+        如果发送信号的线程与接收者所驻足的不在一个线程，则是队列连接。直接连接下，
+        槽函数在发送信号的线程中立即执行；队列连接情况下，槽函数在接收者所在的线程时间循环处理到时，才执行。
+        '''
         self.pdf_handle = PdfHandle()
         self.pdf_thread = QThread()
-        self.pdf_handle.moveToThread(self.pdf_thread)
-        self.radioButton.setText('22')
-        self.radioButton.showMaximized()
-        # self.radioButton.setChecked(True)
-        self.radioButton.setFixedHeight(30)
-
+        # self.pdf_handle.moveToThread(self.pdf_thread)
         self.pdf_thread.finished.connect(self.pdf_handle.deleteLater)
         self.pdf_handle.destroyed.connect(self.pdf_thread.deleteLater)
 
-        self.pdf_handle.open_signal.connect(
-            lambda: self.pdf_handle.open(self._work_path()))
+        self.ocr_handle = OcrHandle(self.pdf_handle)
+        self.ocr_thread = QThread()
+        self.ocr_handle.moveToThread(self.ocr_thread)
+        self.ocr_thread.finished.connect(self.ocr_handle.deleteLater)
+        self.ocr_handle.destroyed.connect(self.ocr_thread.deleteLater)
+        self.ocr_handle.ocr_signal.connect(self.ocr_handle.ocr) #Qt.QueuedConnection
+        self.ocr_thread.start()
 
+        self.pdf_handle.open_signal.connect(self.render_pdf)
         self.pdf_handle.display_signal.connect(self.updateListWidget)
         self.pdf_handle.reload_signal.connect(self.reload)
         self.pdf_handle.clear_signal.connect(self.clear_infos)
+
 
         self.displayLabel.points.points_signal.connect(
             self.updateListWidgetItem)
         self.lineEdit_2.current_page.connect(self.jump)
 
+       
     def jump(self, index):
         if self.pdf_handle.is_editing:
             if index > (self.pdf_handle.pageCount() - 1):
@@ -74,7 +74,20 @@ class PdfWidget(Ui_Form, QWidget):
         self.setWindowTitle('PDF')
         self.label_2.setText('of 0')
         self.lineEdit_2.setText('0')
-        self.displayLabel.hide()
+        self.listWidget.hide()
+        self.pushButton_4.hide()
+        self.frame_2.hide()
+        self.spacelabel.setFixedWidth(self.pdf_handle.screenSize[0] / 12 + self.pushButton_4.width())
+        self.spacelabel.hide()
+
+    @PdfHandle.slot(signal='open_signal')
+    def render_pdf(self):
+        self.pdf_handle.open(self._work_path())
+        self.pushButton_4.setChecked(True)
+        self.pushButton_4.show()
+        self.spacelabel.show()
+        self.listWidget.show()
+        self.frame_2.show()
 
     @PdfHandle.slot(signal='clear_signal')
     def clear_infos(self):
@@ -88,7 +101,7 @@ class PdfWidget(Ui_Form, QWidget):
                                       QMessageBox.No)
         self.pdf_handle.reload = replay
 
-    @PdfHandle.slot(desc='run in pdf_thread')
+    @slot(signal='points_signal', sender='displaylabel', desc='run in pdf_thread')
     def updateListWidgetItem(self, points):
         self.displayLabel.points.clear()
         self.displayLabel.points.appends(points)
@@ -106,7 +119,7 @@ class PdfWidget(Ui_Form, QWidget):
             y4 = y2 / p_height * height
             tmp.extend([x3, y3, x4, y4])
             process.append(tmp)
-
+    
         self.pdf_handle.pixmaps_points[index] = points
         item = self.listWidget.item(index)
         preview_label = self.listWidget.itemWidget(item).preview_label
@@ -138,6 +151,7 @@ class PdfWidget(Ui_Form, QWidget):
         self.displayLabel.setPixmap(display_pixmap)
         self.displayLabel.setEditPixmap(display_pixmap)
         self.displayLabel.setEdit(True)
+        self.displayLabel.metedata.update({'index': 0, 'points': []})
         self.displayLabel.show()
 
         engine = self.pdf_handle.getEngine()
@@ -166,7 +180,7 @@ class PdfWidget(Ui_Form, QWidget):
             QApplication.processEvents()
         self.listWidget.setCurrentRow(0)
 
-    @PdfHandle.slot(desc='run in pdf_thread')
+    @slot(signal='clicked',sender='preview_label', desc='run in pdf_thread')
     def displayPdfPage(self, index):
         item = self.listWidget.currentItem()
         row = self.listWidget.currentRow()
@@ -177,45 +191,48 @@ class PdfWidget(Ui_Form, QWidget):
         self.displayLabel.setPixmap(page)
         self.displayLabel.setEditPixmap(page)
         self.displayLabel.points.appends(self.pdf_handle.pixmaps_points[index])
+        self.displayLabel.metedata.update({'index': row})
         self.displayLabel.update()
 
     def openSlot(self):
         pass
 
-    def confirmSlot(self):
-        # pdf_file = self._work_path()
-        # if exists(pdf_file):
-        #     if pdf_file[-3:].lower() == 'pdf':
-        #         self.pdf_thread.start()
-        #         self.pdf_handle.open_signal.emit()
-        # else:
-        #     QMessageBox.warning(self, '警告', '打开正确的pdf文件')
+    def startSlot(self):  # checkfile
+        file = self._work_path()
+        if exists(file):
+            if file[-3:].lower() in ['pdf', 'png', 'jpg', 'bmp', 'peg'] or isdir(file):
+                self.pdf_thread.start()
+                self.pdf_handle.open_signal.emit()
+        else:
+            QMessageBox.warning(self, '警告', '打开正确格式的文件')
 
-        pdf_file = self._work_path()
-        self.pdf_thread.start()
-        self.pdf_handle.open_signal.emit()
-       
+    def analysisSlot(self):
+        pass
 
     def leftAnSlot(self):
-        rect = self.listWidget.geometry()
-        self.animL = QPropertyAnimation(self.listWidget,
-                                        b'geometry')  
-        self.animL.setDuration(200) 
         if self.pushButton_4.isChecked():
-            self.animL.setStartValue(rect)  
-            self.animL.setEndValue(QRect(-rect.width(), rect.y(), rect.width(),
-                                     rect.height()))  
-        else:
-            self.animL.setStartValue(rect)  
-            self.animL.setEndValue(QRect(0, rect.y(), rect.width(),
-                                     rect.height()))  
-        self.animL.start()
-        if self.pushButton_4.isChecked():
-            self.pushButton_4.setIcon(QIcon(":/image/img/indent-increase.svg"))
-        else:
             self.pushButton_4.setIcon(QIcon(":/image/img/indent-decrease.svg"))
+            self.spacelabel.show()
+            self.listWidget.show()
+        else:
+            self.pushButton_4.setIcon(QIcon(":/image/img/indent-increase.svg"))
+            self.spacelabel.hide()
+            self.listWidget.hide()
 
     def rightAnSlot(self):
+        if self.pushButton_3.isChecked():
+            self.pushButton_3.setIcon(QIcon(":/image/img/indent-decrease.svg"))
+            self.textBrowser.hide()
+        else:
+            self.pushButton_3.setIcon(QIcon(":/image/img/indent-increase.svg"))
+            self.textBrowser.show()
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self.pdf_thread.quit()
+        self.ocr_thread.quit()
+
+    def anaTest(self):
         rect = self.textBrowser.geometry()
         self.anim = QPropertyAnimation(self.textBrowser,
                                        b'geometry')  # 设置动画的对象及其属性
@@ -232,20 +249,15 @@ class PdfWidget(Ui_Form, QWidget):
                       rect.height()))
             self.textBrowser.show()
         self.anim.start()  # 启动动画
-        if self.pushButton_3.isChecked():
-            self.pushButton_3.setIcon(QIcon(":/image/img/indent-decrease.svg"))
-        else:
-            self.pushButton_3.setIcon(QIcon(":/image/img/indent-increase.svg"))
 
+OcrWidget = PdfWidget
 
+        
 def main():
-    # QCoreApplication.setAttribute(Qt.AA_DisableHighDpiScaling)
-    app = QApplication(argv)
-    # InitDpi(app=app)
-    pdfwidget = PdfWidget()
-    pdfwidget.show()
-    exit(app.exec_())
+    app = QApplication(sys.argv)
+    win = PdfWidget()
+    win.show()
+    sys.exit(app.exec_())
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
