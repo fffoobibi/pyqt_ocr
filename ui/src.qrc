@@ -1,5 +1,16 @@
 <RCC>
   <qresource prefix="image">
+    <file>img/198-download2.svg</file>
+    <file>img/checkbox-checked.svg</file>
+    <file>img/checkbox-unchecked.svg</file>
+    <file>img/cog.svg</file>
+    <file>img/cogs.svg</file>
+    <file>img/file-pdf.svg</file>
+    <file>img/folder.svg</file>
+    <file>img/image.svg</file>
+    <file>img/radio-checked2.svg</file>
+    <file>img/radio-unchecked.svg</file>
+    <file>img/search.svg</file>
     <file>img/checkbox_checked.png</file>
     <file>img/checkbox_checked_disable.png</file>
     <file>img/checkbox_parcial.png</file>

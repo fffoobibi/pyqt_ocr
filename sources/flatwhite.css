@@ -206,58 +206,58 @@ QPushButton#btnMenu_Close:hover {
 }
 
 QRadioButton::indicator {
-    width: 15px;
-    height: 15px;
+    width: 25px;
+    height: 25px;
 }
 
 QRadioButton::indicator::unchecked {
-    image: url(:/image/img/radiobutton_unchecked.png);
+    image: url(:/image/img/radio-unchecked.svg);
 }
 
-QRadioButton::indicator::unchecked:disabled {
+/* QRadioButton::indicator::unchecked:disabled {
     image: url(:/image/img/radiobutton_unchecked_disable.png);
-}
+} */
 
 QRadioButton::indicator::checked {
-    image: url(:/image/img/radiobutton_checked.png);
+    image: url(:/image/img/radio-checked2.svg);
 }
 
-QRadioButton::indicator::checked:disabled {
+/* QRadioButton::indicator::checked:disabled {
     image: url(:/image/img/radiobutton_checked_disable.png);
-}
+} */
 
 QGroupBox::indicator, QTreeWidget::indicator, QListWidget::indicator {
     padding: 0px -3px 0px 0px;
 }
 
 QCheckBox::indicator, QGroupBox::indicator, QTreeWidget::indicator, QListWidget::indicator {
-    width: 13px;
-    height: 13px;
+    width: 25px;
+    height: 25px;
 }
 
 QCheckBox::indicator:unchecked, QGroupBox::indicator:unchecked, QTreeWidget::indicator:unchecked, QListWidget::indicator:unchecked {
-    image: url(:/image/img/checkbox_unchecked.png);
+    image: url(:/image/img/checkbox-unchecked.svg);
 }
 
-QCheckBox::indicator:unchecked:disabled, QGroupBox::indicator:unchecked:disabled, QTreeWidget::indicator:unchecked:disabled, QListWidget::indicator:disabled {
+/* QCheckBox::indicator:unchecked:disabled, QGroupBox::indicator:unchecked:disabled, QTreeWidget::indicator:unchecked:disabled, QListWidget::indicator:disabled {
     image: url(:/image/img/checkbox_unchecked_disable.png);
-}
+} */
 
 QCheckBox::indicator:checked, QGroupBox::indicator:checked, QTreeWidget::indicator:checked, QListWidget::indicator:checked {
-    image: url(:/image/img/checkbox_checked.png);
+    image: url(:/image/img/checkbox-checked.svg);
 }
 
-QCheckBox::indicator:checked:disabled, QGroupBox::indicator:checked:disabled, QTreeWidget::indicator:checked:disabled, QListWidget::indicator:checked:disabled {
+/* QCheckBox::indicator:checked:disabled, QGroupBox::indicator:checked:disabled, QTreeWidget::indicator:checked:disabled, QListWidget::indicator:checked:disabled {
     image: url(:/image/img/checkbox_checked_disable.png);
-}
+} */
 
-QCheckBox::indicator:indeterminate, QGroupBox::indicator:indeterminate, QTreeWidget::indicator:indeterminate, QListWidget::indicator:indeterminate {
+/* QCheckBox::indicator:indeterminate, QGroupBox::indicator:indeterminate, QTreeWidget::indicator:indeterminate, QListWidget::indicator:indeterminate {
     image: url(:/image/img/checkbox_parcial.png);
-}
+} */
 
-QCheckBox::indicator:indeterminate:disabled, QGroupBox::indicator:indeterminate:disabled, QTreeWidget::indicator:indeterminate:disabled, QListWidget::indicator:indeterminate:disabled {
+/* QCheckBox::indicator:indeterminate:disabled, QGroupBox::indicator:indeterminate:disabled, QTreeWidget::indicator:indeterminate:disabled, QListWidget::indicator:indeterminate:disabled {
     image: url(:/image/img/checkbox_parcial_disable.png);
-}
+} */
 
 QTimeEdit::up-button, QDateEdit::up-button, QDateTimeEdit::up-button, QDoubleSpinBox::up-button, QSpinBox::up-button {
     image: url(./flatwhite/add_top.png);

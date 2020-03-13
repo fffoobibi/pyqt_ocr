@@ -1,5 +1,6 @@
 import datetime
 
+from os import listdir
 from functools import wraps
 from datetime import datetime
 from typing import List, NoReturn
@@ -21,6 +22,7 @@ save_name = lambda: datetime.now().strftime('%Y%m%d_%H_%M_%S')
 
 __all__ = ['PdfHandle', 'OcrHandle', 'ResultHandle']
 
+
 class BaseHandle(QObject):
     @staticmethod
     def slot(signal: str = '', desc='', sender=''):
@@ -29,8 +31,11 @@ class BaseHandle(QObject):
             def inner(self, *args, **kwargs):
                 res = func(self, *args, **kwargs)
                 return res
+
             return inner
+
         return outer
+
 
 class Engine(object):
     def __init__(self, path):
@@ -39,23 +44,29 @@ class Engine(object):
             self.isPdf = True
             self.isDir = False
             self.isFile = False
-            self.render_type='pdf'
+            self.render_type = 'pdf'
         elif exists(path) and isdir(path):
             self.render = path
             self.isPdf = False
             self.isDir = True
             self.isFile = False
-            self.render_type='dir'
+            self.render_type = 'dir'
         elif isfile(path) and (path[-4:].lower() in [
                 '.png', '.bmp', '.jpg', 'jpeg'
         ]):
             self.isFile = True
             self.isPdf = False
             self.isDir = False
-            self.render_type='file'
+            self.render_type = 'file'
 
         self.__pagesView = None
         self.target = path
+
+    def getName(self, index) -> str:
+        if self.isPdf:
+            return self.pagesView()[index]
+        else:
+            return basename(self.pagesView()[index])
 
     def pagesView(self) -> list:
         if self.__pagesView is None:
@@ -68,6 +79,7 @@ class Engine(object):
                 self.__pagesView = [
                     abspath(join(self.target, file))
                     for file in listdir(self.target)
+                    if file[-4:].lower() in ['.bmp', '.jpg', 'jpeg', '.png']
                 ]
             else:
                 self.__pagesView = [self.target]
@@ -88,7 +100,12 @@ class Engine(object):
                        pdf_pixmap.stride, fmt))
             return pixmap
         else:
-            return QPixmap(self.pagesView()[index])
+            pix = QPixmap(self.pagesView()[index])
+            width, height = pix.width(), pix.height()
+            pix = pix.scaled(width * zoom[0],
+                             height * zoom[1],
+                             transformMode=Qt.SmoothTransformation)
+            return pix
 
     def __getitem__(self, index) -> QPixmap:
         return self.getPixmap(index)
@@ -125,12 +142,16 @@ class PdfHandle(BaseHandle):
         self.__pdf_displayZoom = None
 
         self.__previewZooms: list = None
+        self.__previewSizes: list = None
         self.__displayZooms: list = None
+        self.__displaySizes: list = None
         self.__pageSizes: list = None
 
     def clear(self):
         self.__previewZooms: list = None
+        self.__previewSizes: list = None
         self.__displayZooms: list = None
+        self.__displaySizes: list = None
         self.__pageSizes: list = None
 
         self.__screenSize = None
@@ -160,15 +181,16 @@ class PdfHandle(BaseHandle):
                 rect = desktop.availableGeometry()
                 self.__screenSize = rect.width(), rect.height()
             else:
-                self.__screenSize = desktop.width(), desktop.height()  
+                self.__screenSize = desktop.width(), desktop.height()
         return self.__screenSize
 
     def pageSizes(self) -> List[Size]:
         if self.__pageSizes is None:
             if self.__engine.isPdf:
-                pix = self.__engine.getPixmap(index=0, zoom=(1, 1))
+                pix = self.__engine.getPixmap(index=0, zoom=(2, 2))
                 self.__pageSizes = [(pix.width(), pix.height())
                                     for i in range(self.pageCount())]
+                print('pdf', self.__pageSizes[0])
             elif self.__engine.isFile:
                 pix = self.__engine.getPixmap(index=0)
                 self.__pageSizes = [(pix.width(), pix.height())]
@@ -191,11 +213,16 @@ class PdfHandle(BaseHandle):
                                                0), round(zoom_height, 0)
             return self.__pdf_previewSize
         else:
-            p_width, p_height = self.pageSizes()[index]
-            d_width, d_height = self.screenSize
-            zoom_width = d_width / 12
-            zoom_height = p_height / p_width * zoom_width
-            return round(zoom_width, 0), round(zoom_height, 0)
+            if self.__previewSizes is None:
+                temp = []
+                for size in self.pageSizes():
+                    p_width, p_height = size
+                    d_width, d_height = self.screenSize
+                    zoom_width = d_width / 12
+                    zoom_height = p_height / p_width * zoom_width
+                    temp.append((round(zoom_width, 0), round(zoom_height, 0)))
+                self.__previewSizes = temp
+            return self.__previewSizes[index]
 
     def previewZoom(self, index) -> Zoom:
         if self.__engine.isPdf:
@@ -205,46 +232,50 @@ class PdfHandle(BaseHandle):
                 self.__pdf_previewZoom = width / p_width, width / p_width
             return self.__pdf_previewZoom
         else:
-            p_width, p_height = self.pageSizes()[0]
-            width, height = self.previewSize(0)
-            return width / p_width, width / p_width
+            if self.__previewZooms is None:
+                temp = []
+                for size in self.pageSizes():
+                    p_width, p_height = size
+                    width, height = self.previewSize(0)
+                    temp.append((width / p_width, width / p_width))
+                self.__previewZooms = temp
+            return self.__previewZooms[index]
 
-    def displayZoom(self, index, file_auto=False, dir_auto=False) -> Zoom:
-        def auto_scaled(target, scaled=True):
+    def displayZoom(self, index, max_percent=0.80) -> Zoom:
+        def auto_scaled(target):
             p_width, p_height = target
             d_width, d_height = self.screenSize
             if (p_width, p_height) > (d_width, d_height):
-                scaled_x = max(p_width / d_width, p_height / d_height) - 0.1
-                displayZoom = scaled_x, scaled_x
+                scaled_x = max(p_width / d_width, p_height / d_height)
+                displayZoom = scaled_x * max_percent, scaled_x * max_percent
                 return displayZoom
             else:
-                displayZoom = d_height * 0.8 / p_height, d_height * 0.8 / p_height
-                if scaled:
+                if (d_height * max_percent <=
+                        p_height) or (d_width * max_percent <= p_width):
+                    displayZoom = d_height * max_percent / p_height, d_height * max_percent / p_height
                     return displayZoom
                 return 1.0, 1.0
 
+        if self.__engine.isPdf:
+            if self.__pdf_displayZoom is None:
+                target = self.pageSizes()[0]
+                diszoom = auto_scaled(target)
+                self.__displayZooms = (diszoom
+                                       for i in range(self.pageCount()))
+                self.__pdf_displayZoom = diszoom
+                print('pdf', self.__pdf_displayZoom)
+
+            return self.__pdf_displayZoom
         if self.__displayZooms is None:
-            if self.__engine.isPdf:
-                if self.__pdf_displayZoom is None:
-                    target = self.pageSizes()[index]
-                    diszoom = auto_scaled(target)
-                    self.__displayZooms = (diszoom
-                                           for i in range(self.pageCount()))
-                    self.__pdf_displayZoom = diszoom
-                return self.__pdf_displayZoom
-            elif self.__engine.isFile:
+            if self.__engine.isFile:
                 target = self.pageSizes()[index]
-                self.__displayZooms = [auto_scaled(target, False)]
+                self.__displayZooms = [auto_scaled(target)]
             elif self.__engine.isDir:
                 zooms = []
-                for index in range(self.pageCount()):
-                    pix = self.renderPixmap(index)
-                    target = pix.width(), pix.height()
-                    diszoom = auto_scaled(target, scaled=False)
+                for size in self.pageSizes():
+                    diszoom = auto_scaled(size)
                     zooms.append(diszoom)
                 self.__displayZooms = zooms
-        if self.__engine.isPdf:
-            return self.__pdf_displayZoom
         return self.__displayZooms[index]
 
     def displaySize(self, index) -> Size:
@@ -256,18 +287,31 @@ class PdfHandle(BaseHandle):
                 height = round(p_height * dis_zoom[1], 0)
                 self.__pdf_displaySize = width, height
             return self.__pdf_displaySize
-        else:
-            p_width, p_height = self.pageSizes()[index]
-            dis_zoom = self.displayZoom(index)
-            width, height = round(p_width * dis_zoom[0],
-                                  0), round(p_height * dis_zoom[1], 0)
-            return width, height
+        if self.__displaySizes is None:
+            temp = []
+            for ind, size in enumerate(self.pageSizes()):
+                p_width, p_height = size
+                dis_zoom = self.displayZoom(ind)
+                width, height = round(p_width * dis_zoom[0],
+                                      0), round(p_height * dis_zoom[1], 0)
+                temp.append((width, height))
+            self.__displaySizes = temp
+        return self.__displaySizes[index]
 
     def pageCount(self) -> int:
         return self.__engine.pageCount()
 
-    def renderPixmap(self, index, zoom=(1, 1)) -> QPixmap:
-        pixmap = self.__engine.getPixmap(index, zoom)
+    def renderPixmap(self, index, zoom=(1, 1), *,
+                     pdf_zoom: Zoom = None) -> QPixmap:
+        if self.__engine.isPdf:
+            if pdf_zoom:
+                pixmap = self.__engine.getPixmap(index, pdf_zoom)
+            else:
+                pixmap = self.__engine.getPixmap(index, (2, 2))
+                pixmap = pixmap.scaled(*self.displaySize(0),
+                                       transformMode=Qt.SmoothTransformation)
+        else:
+            pixmap = self.__engine.getPixmap(index, zoom)
         return pixmap
 
     def rendering(self) -> NoReturn:
@@ -276,8 +320,15 @@ class PdfHandle(BaseHandle):
         for index in range(self.pageCount()):
             render_indexes.append(index)
 
+        self.pageSizes()
+        self.displaySize(0)
+        self.displayZoom(0)
+        self.previewSize(0)
+        self.previewZoom(0)
+
         self.pixmaps = render_indexes
         self.pixmaps_points = [[[]] for points in range(len(self.pixmaps))]
+        self.select_state = [True] * len(render_indexes)
 
     def open(self, path) -> NoReturn:
         self.engined_counts += 1
@@ -321,7 +372,7 @@ class ResultsHandle():
             res = []
             for dic in results.get('words_result'):
                 res.append(dic.get('words'))
-            return results, True
+            return res, True
         else:
             return results, False
 
@@ -334,6 +385,7 @@ class OcrHandle(BaseHandle):
         super().__init__()
         self.pdf_handle = pdf_handle
         self.result_handle = ResultsHandle()
+        self.latest_result = ['']
 
     @slot(signal='ocr_signal', sender='self')
     def ocr(self, user: User):
@@ -349,10 +401,44 @@ class OcrHandle(BaseHandle):
             region += ','.join(map(str, rect_coord)) + ';'
         return region.strip(';')
 
+    def pixmapToImage(self, pixmap, sacled_size=None):
+        if sacled_size is None:
+            qimage = pixmap.toImage()
+        else:
+            qimage = pixmap.scaled(
+                *sacled_size, transformMode=Qt.SmoothTransformation).toImage()
+
+        image = ImageQt.fromqimage(qimage)
+        return image
+
+    def _ocrByindex(self, index=0, is_pdf=False):
+        points = self.pdf_handle.pixmaps_points[index]
+        region = self._parse_to_region(points) if points else None
+        pix = self.pdf_handle.renderPixmap(index)
+        displaysize = self.pdf_handle.displaySize(index)
+        img = self.pixmapToImage(pix, displaysize)
+        if not is_pdf:
+            msg = basename(self.workpath)
+        else:
+            msg = basename(self.workpath) + f' page_{index + 1}'
+        self.results_signal.emit(
+            f'<p style="font-weight:bold;color:purple">[{info_time()}] {msg}:</p>'
+        )
+        json = self.ocr_service.request(region=region, img=img)
+        res, flag = self.result_handle.process(json)
+        emit_res = '\n'.join(res)
+        if flag:
+            self.results_signal.emit(
+                f'<pre style="white-space:pre-wrap;">{emit_res}</pre>')
+            self.latest_result[-1] = emit_res
+        else:
+            self.results_signal.emit(str(json))
+            self.latest_result[-1] = str(json)
+
     def baidu(self, user: User):
         config: Config = user.config
         if user.legal:
-            workpath = config.get('parseinfo', 'workpath')
+            self.workpath = config.get('parseinfo', 'workpath')
             service = config.get('recognition', 'type')
             number = config.get('recognition', 'number')
             delay = int(config.get('recognition', 'delay')) * 1000
@@ -363,38 +449,23 @@ class OcrHandle(BaseHandle):
             else:
                 service_type = BAIDU_HANDWRITING_TYPE
 
-            ocr_service = BaiduOcrService(user.id, user.key, user.secret, service_type, seq='\n')
+            self.ocr_service = BaiduOcrService(user.id,
+                                               user.key,
+                                               user.secret,
+                                               service_type,
+                                               seq='\n')
+            render_type = self.pdf_handle.getEngine().render_type
 
-            if self.pdf_handle.getEngine().render_type == 'file':  
-                region = self._parse_to_region(self.pdf_handle.pixmaps_points[0])
-
-                self.results_signal.emit(
-                    f'<p style="font-weight:bold;color:purple">[{info_time()}] {basename(workpath)}:</p>'
-                )
-
-                json = ocr_service.request(region=region, image_path=workpath)
-                self.thread().sleep(2)
-                print('baidu')
-                print(QThread.currentThreadId())
-                res, flag = self.result_handle.process(json)
-                print(res)
-                if flag:
-                    self.results_signal.emit('<p>%s</p>' % '\n'.join(res))
+            if render_type == 'file':
+                self._ocrByindex(0)
+            elif render_type == 'pdf':
+                if self.workpath[:9] == '---此页---:':
+                    index = int(self.workpath[9:]) - 1
+                    self.workpath = f'page_{index + 1}'
+                    self._ocrByindex(index)
                 else:
-                    self.results_signal.emit(str(json))
-
-            else:
-                for index, points in enumerate(self.pdf_handle.pixmaps):
-                    w, h = self.pdf_handle.displaySize(index)
-                    pix = self.pdf_handle.renderPixmap(index)
-                    qimage = pix.scaled(w, h).toImage()
-                    img = ImageQt.fromqimage(qimage)
-                    points = self.pdf_handle.pixmaps_points[index]
-                    region = self._parse_to_region(points) if points else None
-                    json = ocr_service.request(region=region, img=img)
-                    res, flag = self.result_handle.process(json)
-                    if flag:
-                        self.results_signal.emit('<p>%s</p>' % '\n'.join(res))
-                    else:
-                        self.results_signal.emit(str(json))
-                    self.thread().msleep(delay)
+                    for index, _ in enumerate(self.pdf_handle.pixmaps):
+                        self._ocrByindex(index, is_pdf=True)
+                        self.thread().msleep(delay)
+            elif render_type == 'dir':
+                pass

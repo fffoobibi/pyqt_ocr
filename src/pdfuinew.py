@@ -69,7 +69,7 @@ class Ui_Form(object):
         self.comboBox.addItem("")
         self.comboBox.addItem("")
         self.horizontalLayout_3.addWidget(self.comboBox)
-        self.lineEdit = PdfLineEdit(self.frame_5)
+        self.lineEdit = PdfLineEdit(self.frame_5, parent_widget=self)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(20)
         sizePolicy.setVerticalStretch(0)
@@ -206,7 +206,7 @@ class Ui_Form(object):
         spacerItem7 = QtWidgets.QSpacerItem(20, 2000, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout.addItem(spacerItem7)
         self.horizontalLayout_2.addWidget(self.frame_2)
-        self.textBrowser = QtWidgets.QTextBrowser(self.frame_3)
+        self.textBrowser = CTextBrowser(self.frame_3)
         self.textBrowser.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.textBrowser.setObjectName("textBrowser")
         self.horizontalLayout_2.addWidget(self.textBrowser)
@@ -240,11 +240,6 @@ class Ui_Form(object):
         self.radioButton.setText(_translate("Form", "精准"))
         self.radioButton_2.setText(_translate("Form", "通用"))
         self.radioButton_3.setText(_translate("Form", "手写"))
-        self.textBrowser.setHtml(_translate("Form", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
-"p, li { white-space: pre-wrap; }\n"
-"</style></head><body style=\" font-family:\'SimSun\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" text-decoration: underline; color:#0000ff;\">Ocr</span></p>\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>"))
-from customwidgets import DisplayLabel, DragListWidget, PageLineEdit, PdfLineEdit
+        self.textBrowser.setHtml(_translate("Form", '<p><span style=" text-decoration: underline; color:#0000ff;">Ocr</span></p><br/>'))
+from customwidgets import DisplayLabel, DragListWidget, PageLineEdit, PdfLineEdit, CTextBrowser
 import srcs

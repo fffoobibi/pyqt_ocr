@@ -6,6 +6,7 @@ from os.path import exists, join, expanduser, isfile, abspath
 from aip import AipOcr
 from copy import deepcopy
 from functools import wraps
+from PyQt5.QtCore import QMutex
 
 Size = Tuple[int, int]
 Zoom = Tuple[float, float]
@@ -119,10 +120,11 @@ class Config(object):
         self.info.pop(section, None)
 
     def get(self, section: str, key: str, parse=str) -> str:
-        return parse(self.info[section][key])
+        return self.info[section][key] if parse is None else parse(
+            self.info[section][key])
 
     def set(self, section, key, v):
-        self.info.set(section, key, v)
+        self.info[section][key] = v
 
     def flush(self) -> bool:
         dic = self.to_dict()
@@ -145,12 +147,37 @@ class Config(object):
 DEFAULT_CONFIG = Config.fromDict(DEFAULT_SETTINGS)
 
 
-class Account(object):
+class _Single(object):
+
+    _lock = QMutex()
+
+    def __new__(cls, *args, **kwargs):
+        cls._lock.lock()
+        if not hasattr(cls, '_instance'):
+            cls._instance = object.__new__(cls)
+            cls._instance.__inited__ = False
+            setattr(cls, '__init__', cls.singleinit(cls.__init__))
+        cls._lock.unlock()
+        return cls._instance
+
+    @classmethod
+    def singleinit(cls, func):
+        def inner(*args, **kwargs):
+            cls._lock.lock()
+            if getattr(cls._instance, '__inited__') == False:
+                func(*args, **kwargs)
+                setattr(cls._instance, '__inited__', True)
+            cls._lock.unlock()
+
+        return inner
+
+
+class Account(_Single):
     def __init__(self):
         self.file_path = abspath(join(expanduser('~'), 'ocr_user.json'))
         self.reload()
 
-    def reload(self):
+    def reload(self) -> NoReturn:
         if not exists(self.file_path):
             with open(self.file_path, 'w+', encoding='utf8') as file:
                 json.dump(ACCOUNT_SETTINGS,
@@ -159,7 +186,7 @@ class Account(object):
                           indent='  ')
         self.info = json.load(open(self.file_path, 'r', encoding='utf8'))
 
-    def add_user(self, user: 'User'):
+    def add_user(self, user: 'User') -> NoReturn:
         if user.alias in self.info.keys():
             di = {user.alias: user.to_dict()}
             self.info.update(di)
@@ -173,7 +200,7 @@ class Account(object):
                 lis.append(User.fromDict(value))
         return lis
 
-    def alias(self) -> List:
+    def alias(self) -> List[str]:
         return [key for key in self.info if key != 'info']
 
     def active_alias(self) -> str:
@@ -190,23 +217,26 @@ class Account(object):
     def set_active_user(self, alias):
         self.info['info']['active'] = alias
 
-    def get_user(self, alias):
+    def get_user(self, alias) -> 'User':
         user_info = self.info.get(alias, None)
         if user_info is None:
             raise TypeError
         else:
             return User.fromDict(user_info)
 
-    def flush(self):
+    def flush(self) -> NoReturn:
         with open(self.file_path, 'w+', encoding='utf8') as file:
             json.dump(self.info, file, ensure_ascii=False, indent='  ')
 
 
 class User(object):
+
     __users__ = []
+    __lock__ = QMutex()
+
 
     @classmethod
-    def fromDict(cls, dic):
+    def fromDict(cls, dic) -> 'User':
         id = dic['id']
         key = dic['key']
         secret = dic['secret']
@@ -254,14 +284,16 @@ class User(object):
                     self.__legal = True
             return self.__legal
 
+
     def set_config(self, config: Config):
         self.config = config
+
 
     def sync(self, account: Account):
         self.config.pop('temporal')
         account.add_user(self)
-        # account.flush()
 
+   
     def to_dict(self) -> Dict:
         config = self.config.to_dict()
         config.pop('temporal', None)

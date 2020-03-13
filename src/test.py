@@ -1,32 +1,42 @@
-from supports import Account, User, Config
-dic = {'id': '17223708', 'key': 'U50TQUrUMMb1NdRcwuX8844f', 'secret': 'ZNSQzaRIVKZsgSxVppsFeIjoNo40hlCB', 'alias': 'user2', 'platform': 'b', 'legal': True, 'config': {'recognition': {'delay': '2', 'number': 2, 'type': 0}, 'out': {'format': 'txt', 'directory': 'C:\\Users\\fqk12\\Desktop', 'title': 'none'}, 'advanced': {'region': 'none', 'text1': 'none', 'clean': 'false'}, 'parseinfo': {'workpath': '', 'basic': 0, 'handwriting': 0, 'accurate': 0}}}
-account = Account()
-print(account.info)
-print(account.users())
+import threading
+import time
 
-# dic = {
-#     'id': '17223708',
-#     'alias': 'user3',
-#     'config': {
-#         'recognition': {
-#             'delay': '2',
-#             'number': 2,
-#             'type': 0
-#         }
-#     }
-# }
+# class Single(object):
 
-# dic2 = {
-#     'id': '111',
-#     'alias': 'user3',
-#     'config': {
-#         'recognition': {
-#             'delay': '2',
-#             'number': 20000,
-#             'type': -1
-#         }
-#     }
-# }
+#     _lock = threading.Lock()
 
-# dic.update(dic2)
-# print(dic)
+#     def __new__(cls, *args, **kwargs):
+#         with cls._lock:
+#             if not hasattr(cls, '_instance'):
+#                 cls._instance = object.__new__(cls)
+#                 cls._instance.__inited__ = False
+#                 setattr(cls, '__init__', cls.singleinit(cls.__init__))
+#         return cls._instance
+    
+#     @classmethod
+#     def singleinit(cls, func):
+#         def inner(*args,**kwargs):
+#             with cls._lock:
+#                 if getattr(cls._instance, '__inited__') == False:
+#                     func(*args, **kwargs)
+#                     setattr(cls._instance, '__inited__', True)
+#         return inner
+
+#     def __init__(self, name):
+#         print(1111)
+#         self.name = name
+
+from supports import Account, User
+
+def target(i):
+    time.sleep(5)
+    o = Account()
+    print(id(o))
+
+for i in range(4):
+    t = threading.Thread(target=target, args=(i, ))
+    t.start()
+
+User.happy()
+
+

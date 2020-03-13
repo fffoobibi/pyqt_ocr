@@ -1,6 +1,7 @@
 import sys
 
 from functools import wraps
+from math import sqrt
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -11,14 +12,47 @@ from advancedui import Ui_Dialog
 from pdfnew import PdfWidget
 from analysis import AnalysisWidget
 from supports import *
+from srcs import *
+
+G_DPI = 0
+G_WIDTH = 0
+G_HEIGHT = 0
+
+
+def dpi(w_r, h_r, w, h):
+    global G_DPI, G_WIDTH, G_HEIGHT
+    if G_DPI == 0:
+        G_WIDTH = w
+        G_HEIGHT = h
+        G_DPI = sqrt(w**2 + h**2) / sqrt((w_r / 10 * 0.394)**2 +
+                                         (h_r / 10 * 0.394)**2)
+    return G_DPI
+
+
+class InitDpi(QWidget):
+    def __init__(self, parent=None, app=None):
+        super().__init__(parent)
+        desktop = QApplication.desktop()
+        screen_rect = desktop.screenGeometry()
+        height = screen_rect.height()
+        width = screen_rect.width()
+        dpi(desktop.widthMM(), desktop.heightMM(), width, height)
+        font = QFont("宋体")
+        font.setPixelSize(
+            11 *
+            (G_DPI / 96))  # CurrentFontSize *（DevelopmentDPI / CurrentFontDPI）
+        app.setFont(font)
+        self.close()
 
 
 class AdvancedDialog(QDialog, Ui_Dialog):
 
+    radio_signal = pyqtSignal(int)
 
     def __init__(self, *args, **kwargs):
         account = kwargs.pop('account', None)
         super().__init__(*args, **kwargs)
+        self.setWindowIcon(QIcon(':/image/img/cogs.svg'))
         self.setupUi(self)
         self.account: Account = account
 
@@ -27,17 +61,19 @@ class AdvancedDialog(QDialog, Ui_Dialog):
 
     @slot(signal='currentTextChanged', sender='comboBox_2')
     def switch_user_policy(self, text):
-        texts = [self.comboBox_2.itemText(index) for index in range(self.comboBox_2.count())]
+        texts = [
+            self.comboBox_2.itemText(index)
+            for index in range(self.comboBox_2.count())
+        ]
         if text not in texts:
             self.login_lineEdit_id.setText('')
             self.login_lineEdit_key.setText('')
             self.login_lineEdit_secret.setText('')
         else:
-            user  = self.account.info[text]
+            user = self.account.info[text]
             self.login_lineEdit_id.setText(user['id'])
             self.login_lineEdit_key.setText(user['key'])
             self.login_lineEdit_secret.setText(user['secret'])
-            
 
     @slot(signal='currentIndexChanged', sender='comboBox_2')
     def switch_user(self, index):
@@ -50,7 +86,7 @@ class AdvancedDialog(QDialog, Ui_Dialog):
             self.login_lineEdit_secret.setText(active_user.secret)
             self.update_config(active_user.config)
             self.auto = False
-        
+
     def update_account(self, from_user: User):
         self.auto = True
         alias = self.account.active_alias()
@@ -116,7 +152,8 @@ class AdvancedDialog(QDialog, Ui_Dialog):
         })
         self.account.set_active_user(user.alias)
         user.sync(self.account)
-        self.account.flush()
+        # self.account.flush()
+        self.radio_signal.emit(user.config.get('recognition', 'type', int))
         self.close()
 
     def out_buttonSlot(self):
@@ -160,24 +197,47 @@ class MainWidget(QMainWindow, Ui_MainWindow):
 
     def setActions(self):
         self.action_advanced.triggered.connect(self.dialogSlot)
+        self.dialog.radio_signal.connect(self.update_radio)
 
     def setStyles(self):
+        self.setWindowIcon(QIcon(':/image/img/app.ico'))
+        self.setWindowTitle('文字识别')
+        flag = self.account.active_user().config.get('recognition', 'type', int)
+        if flag == 0:
+            self.ocrWidget.radioButton.setChecked(True)
+        elif flag == 1:
+            self.ocrWidget.radioButton_2.setChecked(True)
+        else:
+            self.ocrWidget.radioButton_3.setChecked(True)
+        self.ocrWidget.checkBox.setChecked(True)
+
         with open('./sources/flatwhite.css') as file:
             self.setStyleSheet(file.read())
+        tmp_h = 500 / 768
+        tmp_w = 900 / 1366
+        self.resize(int(G_WIDTH * tmp_w), int(G_HEIGHT * tmp_h))  # w, h
 
     @slot(desc='action_adv triggerd')
     def dialogSlot(self, flag):
-        self.account.reload()
         user = self.account.active_user()
         self.dialog.account = self.account
         self.dialog.update_account(from_user=user)
         self.dialog.update_config(from_config=user.config)
         self.dialog.exec_()
 
+    @slot(signal='radio_signal')
+    def update_radio(self, flag):
+        if flag == 0:
+            self.ocrWidget.radioButton.setChecked(True)
+        elif flag == 1:
+            self.ocrWidget.radioButton_2.setChecked(True)
+        else:
+            self.ocrWidget.radioButton_3.setChecked(True)
 
 
 def main():
     app = QApplication(sys.argv)
+    init = InitDpi(app=app)
     win = MainWidget()
     win.show()
     sys.exit(app.exec_())
