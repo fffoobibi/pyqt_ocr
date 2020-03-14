@@ -54,7 +54,7 @@ class AdvancedDialog(QDialog, Ui_Dialog):
         super().__init__(*args, **kwargs)
         self.setWindowIcon(QIcon(':/image/img/cogs.svg'))
         self.setupUi(self)
-        self.account: Account = account
+        self.account: PdfHandle = account
 
         self.comboBox_2.currentIndexChanged.connect(self.switch_user)
         self.comboBox_2.currentTextChanged.connect(self.switch_user_policy)

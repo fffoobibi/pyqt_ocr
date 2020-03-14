@@ -21,7 +21,7 @@ from mainui import Ui_MainWindow
 from advancedui import Ui_Dialog
 from other import Other
 from customwidgets import ImgLabel
-from supports import Account, User, Config, DEFAULT_CONFIG
+from supports import PdfHandle, User, Config, DEFAULT_CONFIG
 from handles import ResultsHandle, OcrHandle
 
 g_dpi = 0
@@ -245,7 +245,7 @@ class Win(QMainWindow, Ui_MainWindow):
         self.pic_edited = False
         self.results = []
         self.imgs = []
-        self.account = Account()
+        self.account = PdfHandle()
         self.user = self.account.active_user()
         self.desktop = QApplication.desktop()
         self.dialog = AdvancedDialog(self, user=self.account.active_user())

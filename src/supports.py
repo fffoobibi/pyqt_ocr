@@ -6,7 +6,7 @@ from os.path import exists, join, expanduser, isfile, abspath
 from aip import AipOcr
 from copy import deepcopy
 from functools import wraps
-from PyQt5.QtCore import QMutex
+from PyQt5.QtCore import QMutex, QObject, Qt
 
 Size = Tuple[int, int]
 Zoom = Tuple[float, float]
@@ -16,7 +16,7 @@ Region = 'x1,y1,x2,y2;...'
 
 __all__ = [
     'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size',
-    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot'
+    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'QSingle'
 ]
 
 home = abspath(expanduser('~\\Desktop')) if exists(
@@ -147,16 +147,16 @@ class Config(object):
 DEFAULT_CONFIG = Config.fromDict(DEFAULT_SETTINGS)
 
 
-class _Single(object):
+class QSingle(QObject):
 
     _lock = QMutex()
 
     def __new__(cls, *args, **kwargs):
         cls._lock.lock()
         if not hasattr(cls, '_instance'):
-            cls._instance = object.__new__(cls)
+            cls._instance = QObject.__new__(cls)
             cls._instance.__inited__ = False
-            setattr(cls, '__init__', cls.singleinit(cls.__init__))
+            cls.__init__ = cls.singleinit(cls.__init__)
         cls._lock.unlock()
         return cls._instance
 
@@ -166,14 +166,15 @@ class _Single(object):
             cls._lock.lock()
             if getattr(cls._instance, '__inited__') == False:
                 func(*args, **kwargs)
-                setattr(cls._instance, '__inited__', True)
+                cls._instance.__inited__ = True
             cls._lock.unlock()
 
         return inner
 
 
-class Account(_Single):
+class Account(QSingle):
     def __init__(self):
+        super().__init__()
         self.file_path = abspath(join(expanduser('~'), 'ocr_user.json'))
         self.reload()
 
@@ -232,7 +233,7 @@ class Account(_Single):
 class User(object):
 
     __users__ = []
-    __lock__ = QMutex()
+    _lock = QMutex()
 
 
     @classmethod
@@ -242,6 +243,7 @@ class User(object):
         secret = dic['secret']
         platform = dic['platform']
         alias = dic['alias']
+        cls._lock.lock()
         for user in cls.__users__:
             if all([
                     id == user.id, key == user.key, secret == user.key,
@@ -251,7 +253,8 @@ class User(object):
         else:
             legal = dic['legal']
             config = Config.fromDict(dic['config'])
-            return User(id, key, secret, alias, platform, legal, config)
+        cls._lock.unlock()
+        return User(id, key, secret, alias, platform, legal, config)
 
     def __init__(self,
                  id,
@@ -309,3 +312,5 @@ class User(object):
 
     def __repr__(self):
         return f'User<alias:{self.alias}, ...>'
+
+# help(QMutex)

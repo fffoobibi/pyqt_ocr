@@ -18,6 +18,7 @@ from ruia_ocr import (BaiduOcrService, get_file_paths, BAIDU_ACCURATE_TYPE,
 
 from fitz import open as pdf_open
 from supports import Account, User, Config
+from handles import PdfHandle
 
 G_DPI = 0
 G_WIDTH = 0
@@ -164,7 +165,6 @@ class DragListWidget(QListWidget):
                 self.indexes[drag_index], self.indexes[
                     target_index] = self.indexes[target_index], self.indexes[
                         drag_index]
-
             QDropEvent.accept()
 
 
@@ -402,7 +402,7 @@ class DisplayLabel(ImgLabel):
 
     def filePolicy(self):
         menu = QMenu(self)
-        a1 = menu.addAction('清楚区域')
+        a1 = menu.addAction('清除区域')
         a2 = menu.addAction('识别此页')
         action = menu.exec_(QCursor.pos())
         if action == a1:
@@ -423,7 +423,7 @@ class DisplayLabel(ImgLabel):
 
     def pdfPolicy(self):
         menu = QMenu(self)
-        a1 = menu.addAction('清楚区域')
+        a1 = menu.addAction('清除区域')
         a2 = menu.addAction('识别此页')
         a3 = menu.addAction('识别pdf')
         a4 = menu.addAction('导出pdf')
@@ -435,9 +435,14 @@ class DisplayLabel(ImgLabel):
             self.points.points_signal.emit([])
             self.update()
         elif action == a2:
+            true_index = self.__pdfwidget.pdf_handle.fake_pixmap_indexex[int(self.__pdfwidget.lineEdit_2.text()) - 1]
+
+            print('ture', true_index)
+            print('fake', PdfHandle().fake_pixmap_indexex)
+
             activeuser.config.update_from_dict({
                 'parseinfo': {
-                    'workpath': f'---此页---:{self.__pdfwidget.lineEdit_2.text()}',
+                    'workpath': f'---此页---:{true_index}:{self.__pdfwidget.lineEdit_2.text()}',
                     'basic': 0,
                     'handwriting': 0,
                     'accurate': 0
@@ -453,7 +458,7 @@ class DisplayLabel(ImgLabel):
                 }})
             pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
         elif action ==a4:
-            pass
+            pdfwidget.pdf_handle.save_signal.emit(None)
         
     def contextMenu(self, pos):
         render_type = self.getPdfWidget().pdf_handle.getEngine().render_type
@@ -468,6 +473,7 @@ class DisplayLabel(ImgLabel):
 class PreviewLabel(ImgLabel):
 
     clicked = pyqtSignal(int)
+    reset_signal = pyqtSignal()
 
     def __init__(self, *args, **kwargs):
         index = kwargs.pop('index', 0)
@@ -478,7 +484,11 @@ class PreviewLabel(ImgLabel):
         self.setCursor(Qt.PointingHandCursor)
 
     def contextMenu(self, pos):
-        pass
+        menu = QMenu(self)
+        a1 = menu.addAction('恢复排序')
+        action = menu.exec_(QCursor.pos())
+        if action == a1:
+            self.reset_signal.emit()
 
     def mouseReleaseEvent(self, QMouseEvent):
         super().mouseReleaseEvent(QMouseEvent)
@@ -503,7 +513,7 @@ class PreviewWidget(QWidget):
     def __init__(self, index, pixmap, shadow=20):
         super().__init__()
         self.__enter = False
-        self.selected = False
+        self.selected = True
         self.shadow = shadow, shadow, shadow, shadow
         self.preview_label = PreviewLabel(index=index, edit_pixmap=pixmap)
         self.preview_label.setScaledContents(True)
@@ -521,7 +531,7 @@ class PreviewWidget(QWidget):
         painter.end()
 
     def drawPolicy(self, painter):
-        if self.__enter or self.selected:
+        if self.__enter:
             path1 = QPainterPath()
             path1.addRect(QRectF(self.rect()))
             path2 = QPainterPath()

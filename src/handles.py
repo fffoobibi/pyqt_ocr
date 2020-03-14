@@ -11,7 +11,7 @@ from fitz import open as pdf_open
 from os.path import isfile, exists, isdir, abspath, join, basename
 
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QThread
-from PyQt5.QtWidgets import QMessageBox, QApplication
+from PyQt5.QtWidgets import QMessageBox, QApplication, QFileDialog
 from PyQt5.QtGui import QPixmap, QImage
 
 from supports import *
@@ -114,13 +114,14 @@ class Engine(object):
         return f'Engine<{self.target}>'
 
 
-class PdfHandle(BaseHandle):
+class PdfHandle(QSingle):
 
     open_signal = pyqtSignal()
-    display_signal = pyqtSignal()
+    display_signal = pyqtSignal(int, list)  # dis_index, showindexes
     reload_signal = pyqtSignal()
     clear_signal = pyqtSignal()
     ocr_signal = pyqtSignal(list, list)
+    save_signal = pyqtSignal(object)
 
     def __init__(self):
         super().__init__()
@@ -133,13 +134,16 @@ class PdfHandle(BaseHandle):
         self.available_screen = True
 
         self.pixmaps = []
+        self.fake_pixmap_indexex = []
         self.pixmaps_points = []
+        self.select_state = []
         self.edited_pdfs = []
 
         self.__pdf_preview = None
         self.__pdf_previewZoom = None
         self.__pdf_displaySize = None
         self.__pdf_displayZoom = None
+        self.save_signal.connect(self.tolocalPdf)
 
         self.__previewZooms: list = None
         self.__previewSizes: list = None
@@ -162,7 +166,10 @@ class PdfHandle(BaseHandle):
         self.__pdf_displaySize = None
         self.__pdf_displayZoom = None
 
+        self.select_state.clear()
+        # self.select_state = [True] * len(self.pixmaps)
         self.pixmaps.clear()
+        self.fake_pixmap_indexex.clear()
         self.pixmaps_points.clear()
         self.edited_pdfs.clear()
         self.clear_signal.emit()
@@ -190,7 +197,6 @@ class PdfHandle(BaseHandle):
                 pix = self.__engine.getPixmap(index=0, zoom=(2, 2))
                 self.__pageSizes = [(pix.width(), pix.height())
                                     for i in range(self.pageCount())]
-                print('pdf', self.__pageSizes[0])
             elif self.__engine.isFile:
                 pix = self.__engine.getPixmap(index=0)
                 self.__pageSizes = [(pix.width(), pix.height())]
@@ -301,11 +307,19 @@ class PdfHandle(BaseHandle):
     def pageCount(self) -> int:
         return self.__engine.pageCount()
 
-    def renderPixmap(self, index, zoom=(1, 1), *,
-                     pdf_zoom: Zoom = None) -> QPixmap:
+    def renderPixmap(self,
+                     index,
+                     zoom=(1, 1),
+                     *,
+                     pdf_zoom: Zoom = None,
+                     pdf_prezoom: Zoom = None) -> QPixmap:
         if self.__engine.isPdf:
             if pdf_zoom:
                 pixmap = self.__engine.getPixmap(index, pdf_zoom)
+            elif pdf_prezoom:
+                pixmap = self.__engine.getPixmap(index, (2, 2))
+                pixmap = pixmap.scaled(*self.previewSize(0),
+                                       transformMode=Qt.SmoothTransformation)
             else:
                 pixmap = self.__engine.getPixmap(index, (2, 2))
                 pixmap = pixmap.scaled(*self.displaySize(0),
@@ -327,8 +341,10 @@ class PdfHandle(BaseHandle):
         self.previewZoom(0)
 
         self.pixmaps = render_indexes
+        self.fake_pixmap_indexex = render_indexes.copy()
         self.pixmaps_points = [[[]] for points in range(len(self.pixmaps))]
-        self.select_state = [True] * len(render_indexes)
+        self.select_state = [True] * self.pageCount()
+        print('render', self.select_state)
 
     def open(self, path) -> NoReturn:
         self.engined_counts += 1
@@ -348,16 +364,31 @@ class PdfHandle(BaseHandle):
                     self.clear()
                     self.setEngine(path)
                     self.rendering()
-                    self.display_signal.emit()
+                    self.display_signal.emit(0, self.pixmaps)
                     self.reload = QMessageBox.No
             else:
                 self.clear()
                 self.setEngine(path)
                 self.rendering()
-                self.display_signal.emit()
+                self.display_signal.emit(0, self.pixmaps)
 
-    def init(self):
-        pass
+    def tolocalPdf(self, pages: List[int]=None):
+        pdf_name, file_types = QFileDialog.getSaveFileName(
+                None, 'pdf', home, 'PDF(*.pdf)', 'test.pdf')
+        if pdf_name:
+            print('pdf_name', pdf_name)
+            if self.__engine.isPdf:
+                if pages is None:
+                    pgs = []
+                    for state, index in zip(self.select_state, self.pixmaps):
+                        if state:
+                            pgs.append(index)
+                else:
+                    pgs = pages
+                doc = pdf_open(self.__engine.target)
+                doc.select(pgs)
+                doc.save(pdf_name)
+                doc.close()
 
     def __repr__(self):
         return f'PdfHandle<{self.__engine}>'
@@ -377,11 +408,12 @@ class ResultsHandle():
             return results, False
 
 
-class OcrHandle(BaseHandle):
+class OcrHandle(QSingle):
+
     ocr_signal = pyqtSignal(User)
     results_signal = pyqtSignal(object)
 
-    def __init__(self, pdf_handle: PdfHandle):
+    def __init__(self, pdf_handle: PdfHandle=None):
         super().__init__()
         self.pdf_handle = pdf_handle
         self.result_handle = ResultsHandle()
@@ -412,28 +444,29 @@ class OcrHandle(BaseHandle):
         return image
 
     def _ocrByindex(self, index=0, is_pdf=False):
-        points = self.pdf_handle.pixmaps_points[index]
-        region = self._parse_to_region(points) if points else None
-        pix = self.pdf_handle.renderPixmap(index)
-        displaysize = self.pdf_handle.displaySize(index)
-        img = self.pixmapToImage(pix, displaysize)
-        if not is_pdf:
-            msg = basename(self.workpath)
-        else:
-            msg = basename(self.workpath) + f' page_{index + 1}'
-        self.results_signal.emit(
-            f'<p style="font-weight:bold;color:purple">[{info_time()}] {msg}:</p>'
-        )
-        json = self.ocr_service.request(region=region, img=img)
-        res, flag = self.result_handle.process(json)
-        emit_res = '\n'.join(res)
-        if flag:
+        if self.pdf_handle.select_state[index] == True:
+            points = self.pdf_handle.pixmaps_points[index]
+            region = self._parse_to_region(points) if points else None
+            pix = self.pdf_handle.renderPixmap(index)
+            displaysize = self.pdf_handle.displaySize(index)
+            img = self.pixmapToImage(pix, displaysize)
+            if not is_pdf:
+                msg = basename(self.workpath)
+            else:
+                msg = basename(self.workpath) + f' page_{index + 1}'
             self.results_signal.emit(
-                f'<pre style="white-space:pre-wrap;">{emit_res}</pre>')
-            self.latest_result[-1] = emit_res
-        else:
-            self.results_signal.emit(str(json))
-            self.latest_result[-1] = str(json)
+                f'<p style="font-weight:bold;color:purple">[{info_time()}] {msg}:</p>'
+            )
+            json = self.ocr_service.request(region=region, img=img)
+            res, flag = self.result_handle.process(json)
+            emit_res = '\n'.join(res)
+            if flag:
+                self.results_signal.emit(
+                    f'<pre style="white-space:pre-wrap;">{emit_res}</pre>')
+                self.latest_result[-1] = emit_res
+            else:
+                self.results_signal.emit(str(json))
+                self.latest_result[-1] = str(json)
 
     def baidu(self, user: User):
         config: Config = user.config
@@ -460,12 +493,13 @@ class OcrHandle(BaseHandle):
                 self._ocrByindex(0)
             elif render_type == 'pdf':
                 if self.workpath[:9] == '---此页---:':
-                    index = int(self.workpath[9:]) - 1
-                    self.workpath = f'page_{index + 1}'
-                    self._ocrByindex(index)
+                    true, current_text = self.workpath[9:].split(':')
+                    self.workpath = f'page_{current_text}'
+                    self._ocrByindex(int(true))
                 else:
-                    for index, _ in enumerate(self.pdf_handle.pixmaps):
+                    for index, _ in enumerate(self.pdf_handle.fake_pixmap_indexex):
                         self._ocrByindex(index, is_pdf=True)
                         self.thread().msleep(delay)
+
             elif render_type == 'dir':
                 pass

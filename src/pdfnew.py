@@ -1,13 +1,13 @@
 import sys
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
-from PyQt5.QtCore import *
+from PyQt5.QtWidgets import QWidget, QApplication, QListWidgetItem, QMessageBox
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import QThread, QSize
 
 from os.path import isdir, exists
 from pdfuinew import Ui_Form
 from handles import PdfHandle, OcrHandle
 from customwidgets import PreviewWidget
-from supports import slot, home
+from supports import *
 from srcs import *
 
 
@@ -15,10 +15,10 @@ class PdfWidget(Ui_Form, QWidget):
     def __init__(self, *args, **kwargs):
         account = kwargs.pop('account', None)
         super().__init__(*args, **kwargs)
+        self.account = Account()
         self.setupUi(self)
         self.set_datas()
         self.init()
-        self.account = account
 
     def _work_path(self):
         return self.lineEdit.text().strip('"').strip(' ')
@@ -37,13 +37,12 @@ class PdfWidget(Ui_Form, QWidget):
         self.pdf_thread.finished.connect(self.pdf_handle.deleteLater)
         self.pdf_handle.destroyed.connect(self.pdf_thread.deleteLater)
 
-        self.ocr_handle = OcrHandle(self.pdf_handle)
+        self.ocr_handle = OcrHandle(self.pdf_handle)  #self.pdf_handle
         self.ocr_thread = QThread()
         self.ocr_handle.moveToThread(self.ocr_thread)
         self.ocr_thread.finished.connect(self.ocr_handle.deleteLater)
         self.ocr_handle.destroyed.connect(self.ocr_thread.deleteLater)
-        self.ocr_handle.ocr_signal.connect(
-            self.ocr_handle.ocr)  #Qt.QueuedConnection
+        self.ocr_handle.ocr_signal.connect(self.ocr_handle.ocr) 
         self.ocr_handle.results_signal.connect(self.display)
         self.ocr_thread.start()
 
@@ -57,23 +56,22 @@ class PdfWidget(Ui_Form, QWidget):
             self.updateListWidgetItem)
         self.lineEdit_2.current_page.connect(self.jump)
         self.checkBox.stateChanged.connect(self.update_checkstate)
-        self.radioButton.toggled.connect(self.test)
-        self.radioButton_2.toggled.connect(self.test)
-        self.radioButton_3.toggled.connect(self.test)
+        self.radioButton.toggled.connect(self.update_radiostate)
+        self.radioButton_2.toggled.connect(self.update_radiostate)
+        self.radioButton_3.toggled.connect(self.update_radiostate)
 
-    def test(self, state):
+    def update_radiostate(self, state):
         user = self.account.active_user()
         if self.sender() == self.radioButton:
             if state:
                 user.config.set('recognition', 'type', 0)
         elif self.sender() == self.radioButton_2:
             if state:
-                user.config.set('recognition', 'type', 1) 
+                user.config.set('recognition', 'type', 1)
         elif self.sender() == self.radioButton_3:
             if state:
                 user.config.set('recognition', 'type', 2)
         user.sync(self.account)
-        # print(self.sender().objectName(),  state)
 
     def update_checkstate(self, state):
         index = int(self.lineEdit_2.text()) - 1
@@ -83,8 +81,10 @@ class PdfWidget(Ui_Form, QWidget):
             elif state == 0:
                 self.pdf_handle.select_state[index] = False
             print(111, state)
-        except: ...
+        except:
+            ...
 
+    @slot(signal='returnPressed', sender='lineEdit_2')
     def jump(self, index):
         if self.pdf_handle.is_editing:
             if index > (self.pdf_handle.pageCount() - 1):
@@ -111,7 +111,7 @@ class PdfWidget(Ui_Form, QWidget):
                                       self.pushButton_4.width())
         self.spacelabel.hide()
 
-    @PdfHandle.slot(signal='open_signal')
+    @slot(signal='open_signal', sender='')
     def render_pdf(self):
         self.pdf_handle.open(self._work_path())
         if self.pdf_handle.getEngine().isFile:
@@ -125,39 +125,42 @@ class PdfWidget(Ui_Form, QWidget):
         self.spacelabel.show()
         self.frame_2.show()
 
-    @PdfHandle.slot(signal='clear_signal')
+    @slot(signal='clear_signal', sender='')
     def clear_infos(self):
         self.listWidget.clear()
         self.displayLabel.points.clear()
 
-    @PdfHandle.slot(signal='reload_signal')
+    @slot(signal='reload_signal', sender='')
     def reload(self):
         replay = QMessageBox.question(self, 'PDF', '确认重新加载pdf么?',
                                       QMessageBox.Yes | QMessageBox.No,
                                       QMessageBox.No)
         self.pdf_handle.reload = replay
 
-    @slot(signal='points_signal',
-          sender='displaylabel',
-          desc='run in pdf_thread')
+    def _disPointsToPrePoints(self, dis_index,
+                              dis_points: RectCoords) -> RectCoords or [[]]:
+        p_width, p_height = self.pdf_handle.displaySize(dis_index)
+        width, height = self.pdf_handle.previewSize(dis_index)
+        process = []
+        for point in dis_points:
+            tmp = []
+            if point:
+                x1, y1, x2, y2 = point
+                x3 = x1 / p_width * width
+                y3 = y1 / p_height * height
+                x4 = x2 / p_width * width
+                y4 = y2 / p_height * height
+                tmp.extend([x3, y3, x4, y4])
+                process.append(tmp)
+        return process if process else [[]]
+
+    @slot(signal='points_signal', sender='displaylabel')
     def updateListWidgetItem(self, points):
+        self.pdf_handle.fake_pixmap_indexex = self.listWidget.indexes # 重要
         self.displayLabel.points.clear()
         self.displayLabel.points.appends(points)
-
         index = int(self.lineEdit_2.text()) - 1
-        p_width, p_height = self.pdf_handle.displaySize(index)
-        width, height = self.pdf_handle.previewSize(index)
-        process = []
-        for point in points:
-            tmp = []
-            x1, y1, x2, y2 = point
-            x3 = x1 / p_width * width
-            y3 = y1 / p_height * height
-            x4 = x2 / p_width * width
-            y4 = y2 / p_height * height
-            tmp.extend([x3, y3, x4, y4])
-            process.append(tmp)
-
+        process = self._disPointsToPrePoints(index, points)
         self.pdf_handle.pixmaps_points[index] = points
         item = self.listWidget.item(index)
         preview_label = self.listWidget.itemWidget(item).preview_label
@@ -169,21 +172,49 @@ class PdfWidget(Ui_Form, QWidget):
         shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
         widget = PreviewWidget(index, pixmap, shadow_width)
         widget.preview_label.clicked.connect(self.displayPdfPage)
+        widget.preview_label.reset_signal.connect(self.resetListWidget)
         widget.preview_label.setFixedSize(*self.pdf_handle.previewSize(index))
         return widget
 
+    @slot(signal='reset_signal', sender='preview_label')
+    def resetListWidget(self):
+
+        self.listWidget.indexes = self.pdf_handle.pixmaps.copy()
+        self.pdf_handle.fake_pixmap_indexex = self.listWidget.indexes # 重要
+        self.pdf_handle.select_state = [True] * len(self.pdf_handle.pixmaps)
+
+        for index, label_points in enumerate(self.pdf_handle.pixmaps_points):
+            item = self.listWidget.item(index)
+            preview_label = self.listWidget.itemWidget(item).preview_label
+            preview_label.index = index
+            preview_label.setEditPixmap(
+                self.pdf_handle.renderPixmap(
+                    index, pdf_prezoom=self.pdf_handle.previewZoom(index)))
+
+            preview_label.points.clear()
+            preview_label.points.appends(
+                self._disPointsToPrePoints(index, label_points))
+            preview_label.update()
+            QApplication.processEvents()
+        self.listWidget.setCurrentRow(0)
+        item = self.listWidget.item(index)
+        preview_label = self.listWidget.itemWidget(item).preview_label
+        preview_label.clicked.emit(0)
+
     @slot(signal='display_signal', sender='pdf_handle')
-    def updateListWidget(self):  # 槽函数
+    def updateListWidget(self, dis_index: int,
+                         list_widget_indexes: list):  # 槽函数
+
         engine = self.pdf_handle.getEngine()
 
-        shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
-        preview_width, preview_height = self.pdf_handle.previewSize(0)
-        preview_zoom = self.pdf_handle.previewZoom(0)
-        display_zoom = self.pdf_handle.displayZoom(0)
-        display_pixmap = self.pdf_handle.renderPixmap(0, display_zoom)
+        shadow_width = self.pdf_handle.screenSize[dis_index] / 12 / 14
+        preview_width, preview_height = self.pdf_handle.previewSize(dis_index)
+        preview_zoom = self.pdf_handle.previewZoom(dis_index)
+        display_zoom = self.pdf_handle.displayZoom(dis_index)
+        display_pixmap = self.pdf_handle.renderPixmap(dis_index, display_zoom)
 
         self.label_2.setText('of %s' % self.pdf_handle.pageCount())
-        self.lineEdit_2.setText('1')
+        self.lineEdit_2.setText(str(dis_index + 1))
 
         self.listWidget.setFixedWidth(preview_width + shadow_width * 2 +
                                       10 * 2 + 20)
@@ -191,11 +222,13 @@ class PdfWidget(Ui_Form, QWidget):
         self.displayLabel.setEditPixmap(display_pixmap)
         self.displayLabel.setEdit(True)
         self.displayLabel.show()
-        self.filelabel.setText(engine.getName(0))
+        self.filelabel.setText(engine.getName(dis_index))
 
         # 生成预览图
-        self.listWidget.indexes = self.pdf_handle.pixmaps
-        for index in self.pdf_handle.pixmaps:
+        self.listWidget.indexes = self.pdf_handle.pixmaps.copy()
+        self.pdf_handle.fake_pixmap_indexex = self.listWidget.indexes # 重要
+
+        for index in list_widget_indexes:
             if engine.isPdf:
                 pix = self.pdf_handle.renderPixmap(index, preview_zoom)
                 item = QListWidgetItem()
@@ -217,7 +250,7 @@ class PdfWidget(Ui_Form, QWidget):
             self.listWidget.addItem(item)
             self.listWidget.setItemWidget(item, widget)
             QApplication.processEvents()
-        self.listWidget.setCurrentRow(0)
+        self.listWidget.setCurrentRow(dis_index)
 
     @slot(signal='clicked', sender='preview_label', desc='run in pdf_thread')
     def displayPdfPage(self, index):
@@ -233,12 +266,13 @@ class PdfWidget(Ui_Form, QWidget):
         self.displayLabel.points.appends(self.pdf_handle.pixmaps_points[index])
         self.displayLabel.update()
         self.filelabel.setText(self.pdf_handle.getEngine().getName(index))
+
         if self.pdf_handle.select_state[index] == True:
             self.checkBox.setChecked(True)
         else:
             self.checkBox.setChecked(False)
+
         print('state', self.pdf_handle.select_state)
-        
 
     def openSlot(self):
         if self.comboBox.currentText() == '图片':
@@ -251,7 +285,7 @@ class PdfWidget(Ui_Form, QWidget):
             if dir_name:
                 self.lineEdit.setText(dir_name)
         else:
-            pdf_name,  file_types = QFileDialog.getOpenFileName(
+            pdf_name, file_types = QFileDialog.getOpenFileName(
                 self, 'pdf', home, 'PDF(*.pdf)')
             if pdf_name:
                 self.lineEdit.setText(pdf_name)
