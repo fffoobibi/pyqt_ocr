@@ -1,15 +1,14 @@
-# from supports import Account
-from handles import PdfHandle
 
-# a = Account()
-# b = Account()
+import fitz
 
-a = PdfHandle()
-b = PdfHandle()
-c = PdfHandle()
-d = PdfHandle()
+def test():
+    eng:fitz.Document = fitz.open(r"C:\Users\fqk12\Desktop\progit_v2.1.30.pdf")
+    for page in eng:
+        pix = page.getPixmap()
+    eng.close()
+    from guppy import hpy;hxx = hpy();heap = hxx.heap()
+    print(heap)
 
-print(id(a))
-print(id(b))
-print(id(c))
-print(id(d))
+if __name__ == '__main__':
+    # main()
+    test()

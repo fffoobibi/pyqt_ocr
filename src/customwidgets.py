@@ -20,34 +20,6 @@ from fitz import open as pdf_open
 from supports import Account, User, Config
 from handles import PdfHandle
 
-G_DPI = 0
-G_WIDTH = 0
-G_HEIGHT = 0
-
-def dpi(w_r, h_r, w, h):
-    global G_DPI, G_WIDTH, G_HEIGHT
-    if G_DPI == 0:
-        G_WIDTH = w
-        G_HEIGHT = h
-        G_DPI = sqrt(w**2 + h**2) / sqrt((w_r / 10 * 0.394)**2 +
-                                         (h_r / 10 * 0.394)**2)
-    return G_DPI
-
-class InitDpi(QWidget):
-    def __init__(self, parent=None, app=None):
-        super().__init__(parent)
-        desktop = QApplication.desktop()
-        screen_rect = desktop.screenGeometry()
-        height = screen_rect.height()
-        width = screen_rect.width()
-        dpi(desktop.widthMM(), desktop.heightMM(), width, height)
-        font = QFont("宋体")
-        font.setPixelSize(
-            11 *
-            (G_DPI / 96))  # CurrentFontSize *（DevelopmentDPI / CurrentFontDPI）
-        app.setFont(font)
-        self.close()
-
 
 class CTextBrowser(QTextBrowser):
     copy_latest = pyqtSignal()
@@ -83,14 +55,19 @@ class DragListWidget(QListWidget):
         self.setMovement(QListView.Free)
         self.setSpacing(10)
         self.indexes = []
+        self._start_press = None
 
     def mousePressEvent(self, QMouseEvent):
         if QMouseEvent.button() == Qt.LeftButton:
             self.drag_item = self.itemAt(QMouseEvent.pos())
+            self._start_press = QMouseEvent.pos()
         super().mousePressEvent(QMouseEvent)
 
     def mouseMoveEvent(self, QMouseEvent):
         if QMouseEvent.buttons() & Qt.LeftButton:
+            if (QMouseEvent.pos() - self._start_press
+                ).manhattanLength() < QApplication.startDragDistance():
+                return
             if self.drag_item:
                 drag = QDrag(self)
                 data = QMimeData()
@@ -197,18 +174,19 @@ class PdfLineEdit(DragLineEdit):
         parent_widget = kwargs.pop('parent_widget', None)
         super().__init__(*args, **kwargs)
         self.parent_widget = parent_widget
-        
+
     def filterPolicy(self, event):
         if event.mimeData().hasText():
             path = event.mimeData().text()[-4:]
             if path.lower() in ['.pdf', '.png', '.jpg', '.jpeg', '.bmp']:
                 return True
-            elif isdir(event.mimeData().text()[8:]) and exists(event.mimeData().text()[8:]):
+            elif isdir(event.mimeData().text()[8:]) and exists(
+                    event.mimeData().text()[8:]):
                 return True
         return False
 
     def dropEvent(self, event):
-        super().dropEvent(event)
+        self.setText(event.mimeData().text()[8:])
         path = event.mimeData().text()[-4:]
         if path.lower() in ['.pdf', '.png', '.jpg', '.jpeg', '.bmp']:
             if path.lower() == '.pdf':
@@ -217,7 +195,7 @@ class PdfLineEdit(DragLineEdit):
                 self.parent_widget.comboBox.setCurrentIndex(1)
         else:
             self.parent_widget.comboBox.setCurrentIndex(2)
-
+        self.parent_widget.startSlot()
 
 
 class PageLineEdit(QLineEdit):
@@ -327,6 +305,7 @@ class ImgLabel(QLabel):
 
     def mousePressEvent(self, QMouseEvent):
         if self.__edit_pixmap and self.edited:
+            print(self, 'press')
             if QMouseEvent.button() == Qt.LeftButton:
                 self.points.append([QMouseEvent.x(), QMouseEvent.y(), 0, 0])
         else:
@@ -384,10 +363,10 @@ class DisplayLabel(ImgLabel):
         pdfwidget = kwargs.pop('pdfwidget', None)
         super().__init__(*args, **kwargs)
         self.__pdfwidget = pdfwidget
-        self.metedata = {'index': -1}
+        # self.metedata = {'index': -1}
 
     def mouseMoveEvent(self, QMouseEvent):
-        if self.edited : #???
+        if self.edited:  #???
             if (QMouseEvent.buttons()
                     & Qt.LeftButton) and self.rect().contains(
                         QMouseEvent.pos()):
@@ -418,7 +397,8 @@ class DisplayLabel(ImgLabel):
                     'basic': 0,
                     'handwriting': 0,
                     'accurate': 0
-                }})
+                }
+            })
             pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
 
     def pdfPolicy(self):
@@ -435,18 +415,18 @@ class DisplayLabel(ImgLabel):
             self.points.points_signal.emit([])
             self.update()
         elif action == a2:
-            true_index = self.__pdfwidget.pdf_handle.fake_pixmap_indexex[int(self.__pdfwidget.lineEdit_2.text()) - 1]
-
-            print('ture', true_index)
-            print('fake', PdfHandle().fake_pixmap_indexex)
+            true_index = self.__pdfwidget.pdf_handle.fake_pixmaps_indexes[
+                int(self.__pdfwidget.lineEdit_2.text()) - 1]
 
             activeuser.config.update_from_dict({
                 'parseinfo': {
-                    'workpath': f'---此页---:{true_index}:{self.__pdfwidget.lineEdit_2.text()}',
+                    'workpath':
+                    f'---此页---:{true_index}:{self.__pdfwidget.lineEdit_2.text()}',
                     'basic': 0,
                     'handwriting': 0,
                     'accurate': 0
-                }})
+                }
+            })
             pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
         elif action == a3:
             activeuser.config.update_from_dict({
@@ -455,17 +435,54 @@ class DisplayLabel(ImgLabel):
                     'basic': 0,
                     'handwriting': 0,
                     'accurate': 0
-                }})
+                }
+            })
             pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
-        elif action ==a4:
+        elif action == a4:
             pdfwidget.pdf_handle.save_signal.emit(None)
-        
+
+    def dirPolicy(self):
+        menu = QMenu(self)
+        a1 = menu.addAction('清除区域')
+        a2 = menu.addAction('识别此页')
+        a3 = menu.addAction('识别全部')
+        action = menu.exec_(QCursor.pos())
+        pdfwidget = self.getPdfWidget()
+        activeuser = pdfwidget.account.active_user()
+        if action == a1:
+            self.points.clear()
+            self.points.points_signal.emit([])
+            self.update()
+        elif action == a2:
+            true_index = self.__pdfwidget.pdf_handle.fake_pixmaps_indexes[
+                int(self.__pdfwidget.lineEdit_2.text()) - 1]
+            activeuser.config.update_from_dict({
+                'parseinfo': {
+                    'workpath':
+                    f'---此页---:{true_index}:{self.__pdfwidget.lineEdit_2.text()}',
+                    'basic': 0,
+                    'handwriting': 0,
+                    'accurate': 0
+                }
+            })
+            pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
+        elif action == a3:
+            activeuser.config.update_from_dict({
+                'parseinfo': {
+                    'workpath': pdfwidget._work_path(),
+                    'basic': 0,
+                    'handwriting': 0,
+                    'accurate': 0
+                }
+            })
+            pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
+
     def contextMenu(self, pos):
         render_type = self.getPdfWidget().pdf_handle.getEngine().render_type
         if render_type == 'file':
             self.filePolicy()
         elif render_type == 'dir':
-            pass
+            self.dirPolicy()
         elif render_type == 'pdf':
             self.pdfPolicy()
 
@@ -510,6 +527,8 @@ class PreviewLabel(ImgLabel):
 
 
 class PreviewWidget(QWidget):
+    __slots__ = '__enter', 'selected', 'shadow', 'preview_label','layout'
+
     def __init__(self, index, pixmap, shadow=20):
         super().__init__()
         self.__enter = False

@@ -16,7 +16,7 @@ Region = 'x1,y1,x2,y2;...'
 
 __all__ = [
     'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size',
-    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'QSingle'
+    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'QSingle', 'NoReturn'
 ]
 
 home = abspath(expanduser('~\\Desktop')) if exists(
@@ -278,7 +278,7 @@ class User(object):
         if self.platform == 'b':
             if self.__legal == False:
                 from aip import AipOcr
-                img = open('./checkUser.png').read()
+                img = open('./sources/checkUser.png').read()
                 client = AipOcr(self.id, self.key, self.secret)
                 res = client.basicGeneral(img)
                 if res.get('error_code', None) == 14:
@@ -312,5 +312,3 @@ class User(object):
 
     def __repr__(self):
         return f'User<alias:{self.alias}, ...>'
-
-# help(QMutex)

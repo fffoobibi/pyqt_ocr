@@ -54,8 +54,7 @@ class AdvancedDialog(QDialog, Ui_Dialog):
         super().__init__(*args, **kwargs)
         self.setWindowIcon(QIcon(':/image/img/cogs.svg'))
         self.setupUi(self)
-        self.account: PdfHandle = account
-
+        self.account = account or Account()
         self.comboBox_2.currentIndexChanged.connect(self.switch_user)
         self.comboBox_2.currentTextChanged.connect(self.switch_user_policy)
 
@@ -152,7 +151,6 @@ class AdvancedDialog(QDialog, Ui_Dialog):
         })
         self.account.set_active_user(user.alias)
         user.sync(self.account)
-        # self.account.flush()
         self.radio_signal.emit(user.config.get('recognition', 'type', int))
         self.close()
 
@@ -197,7 +195,7 @@ class MainWidget(QMainWindow, Ui_MainWindow):
 
     def setActions(self):
         self.action_advanced.triggered.connect(self.dialogSlot)
-        self.dialog.radio_signal.connect(self.update_radio)
+        self.dialog.radio_signal.connect(self.updateRadio)
 
     def setStyles(self):
         self.setWindowIcon(QIcon(':/image/img/app.ico'))
@@ -226,13 +224,19 @@ class MainWidget(QMainWindow, Ui_MainWindow):
         self.dialog.exec_()
 
     @slot(signal='radio_signal')
-    def update_radio(self, flag):
+    def updateRadio(self, flag):
         if flag == 0:
             self.ocrWidget.radioButton.setChecked(True)
         elif flag == 1:
             self.ocrWidget.radioButton_2.setChecked(True)
         else:
             self.ocrWidget.radioButton_3.setChecked(True)
+
+    def closeEvent(self, event):
+        super().closeEvent(event)
+        self.ocrWidget.pdf_thread.quit()
+        self.ocrWidget.ocr_thread.quit()
+        self.account.flush()
 
 
 def main():
