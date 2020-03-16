@@ -24,13 +24,6 @@ class PdfWidget(Ui_Form, QWidget):
         return self.lineEdit.text().strip('"').strip(' ')
 
     def setHandles(self):
-        '''
-        在QT5中，信号可以连接到一切可以调用的对象上，包括普通函数，成员函数，函数对象，lambda表达式；
-        总的来说，信号与槽的连接有两种方式：1、直接连接 2、队列连接；默认的自动连接下，如果发射信号的线程
-        （而不是发送者所在的线程）与接受者所驻足的线程相同，则是队列连接；
-        如果发送信号的线程与接收者所驻足的不在一个线程，则是队列连接。直接连接下，
-        槽函数在发送信号的线程中立即执行；队列连接情况下，槽函数在接收者所在的线程时间循环处理到时，才执行。
-        '''
         self.pdf_handle = PdfHandle()
         self.pdf_thread = QThread()
         self.pdf_handle.moveToThread(self.pdf_thread)
@@ -146,11 +139,11 @@ class PdfWidget(Ui_Form, QWidget):
         self.frame_2.show()
         self.pdf_handle.open(self._work_path())
         
-
     @slot(signal='clear_signal', sender='')
     def clear_infos(self):
         self.listWidget.clear()
         self.displayLabel.points.clear()
+        import gc; gc.collect()
 
     @slot(signal='reload_signal', sender='')
     def reload(self):
@@ -251,13 +244,16 @@ class PdfWidget(Ui_Form, QWidget):
         display_zoom = self.pdf_handle.displayZoom(dis_index)
         display_pixmap = self.pdf_handle.renderPixmap(dis_index, display_zoom)
 
+        # tets = self.pdf_handle.renderPixmap(0, pdf_prezoom=True)
+        # tets.save('1.png')
+
         self.label_2.setText('of %s' % self.pdf_handle.pageCount())
         self.lineEdit_2.setText(str(dis_index + 1))
 
         self.listWidget.setFixedWidth(preview_width + shadow_width * 2 +
                                       10 * 2 + 20)
         self.displayLabel.setPixmap(display_pixmap)
-        self.displayLabel.setEditPixmap(display_pixmap)
+        self.displayLabel.setEditPixmap(True)
         self.displayLabel.setEdit(True)
         self.displayLabel.show()
         self.filelabel.setText(engine.getName(dis_index))
@@ -292,6 +288,7 @@ class PdfWidget(Ui_Form, QWidget):
             self.listWidget.setItemWidget(item, widget)
             QApplication.processEvents()
         self.listWidget.setCurrentRow(dis_index)
+
         from guppy import hpy;hxx = hpy();heap = hxx.heap()
         print(heap)
         print(sys.getsizeof(self.listWidget))

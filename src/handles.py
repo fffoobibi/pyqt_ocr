@@ -1,7 +1,7 @@
 import datetime
-
 from os import listdir
 from functools import wraps
+from gc import collect
 from datetime import datetime
 from typing import List, NoReturn
 
@@ -93,7 +93,7 @@ class Engine(object):
     def getPixmap(self, index, zoom=(1.0, 1.0)) -> QPixmap:
         if self.isPdf:
             x, y = zoom
-            pdf_pixmap = self.render[index].getPixmap(Matrix(x, y))
+            pdf_pixmap = self.render[index].getPixmap(Matrix(2*x, 2*y))
             fmt = QImage.Format_RGBA8888 if pdf_pixmap.alpha else QImage.Format_RGB888
             pixmap = QPixmap.fromImage(
                 QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
@@ -107,6 +107,13 @@ class Engine(object):
                              height * zoom[1],
                              transformMode=Qt.SmoothTransformation)
             return pix
+
+    def close(self):
+        if self.isPdf:
+            self.render.close()
+        self.render = None
+        self.__pagesView = None
+        collect()
 
     def __getitem__(self, index) -> QPixmap:
         return self.getPixmap(index)
@@ -162,7 +169,7 @@ class PdfHandle(QSingle):
 
         self.__screenSize = None
         self.is_editing = False
-
+        
         self.__pdf_previewSize = None
         self.__pdf_previewZoom = None
         self.__pdf_displaySize = None
@@ -173,7 +180,15 @@ class PdfHandle(QSingle):
         self.pixmaps_points.clear()
         self.edited_pdfs.clear()
         self.select_state.clear()
+        
+        try:
+            self.__engine.close()
+        finally:
+            self.__engine = None
+            collect()
+
         self.clear_signal.emit()
+
 
     def setEngine(self, path):
         self.__engine = Engine(path)
@@ -195,7 +210,7 @@ class PdfHandle(QSingle):
     def pageSizes(self) -> List[Size]:
         if self.__pageSizes is None:
             if self.__engine.isPdf:
-                pix = self.__engine.getPixmap(index=0, zoom=(2, 2))
+                pix = self.__engine.getPixmap(index=0, zoom=(1, 1))
                 self.__pageSizes = [(pix.width(), pix.height())
                                     for i in range(self.pageCount())]
             elif self.__engine.isFile:
@@ -209,12 +224,12 @@ class PdfHandle(QSingle):
                 self.__pageSizes = page_size
         return self.__pageSizes
 
-    def previewSize(self, index) -> Size:
+    def previewSize(self, index, shrink=12) -> Size: # 默认预览图片屏幕分辨率的1/12
         if self.__engine.isPdf:
             if self.__pdf_previewSize is None:
                 p_width, p_height = self.pageSizes()[0]
                 d_width, d_height = self.screenSize
-                zoom_width = d_width / 12
+                zoom_width = d_width / shrink
                 zoom_height = p_height / p_width * zoom_width
                 self.__pdf_previewSize = round(zoom_width,
                                                0), round(zoom_height, 0)
@@ -231,11 +246,11 @@ class PdfHandle(QSingle):
                 self.__previewSizes = temp
             return self.__previewSizes[index]
 
-    def previewZoom(self, index) -> Zoom:
+    def previewZoom(self, index, shrink=12) -> Zoom:
         if self.__engine.isPdf:
             if self.__pdf_previewZoom is None:
                 p_width, p_height = self.pageSizes()[0]
-                width, height = self.previewSize(0)
+                width, height = self.previewSize(0, shrink)
                 self.__pdf_previewZoom = width / p_width, width / p_width
             return self.__pdf_previewZoom
         else:
@@ -308,18 +323,9 @@ class PdfHandle(QSingle):
                      zoom=(1, 1),
                      *,
                      pdf_zoom: Zoom = None,
-                     pdf_prezoom: Zoom = None) -> QPixmap:
+                     pdf_prezoom: bool = False) -> QPixmap:
         if self.__engine.isPdf:
-            if pdf_zoom:
-                pixmap = self.__engine.getPixmap(index, pdf_zoom)
-            elif pdf_prezoom:
-                pixmap = self.__engine.getPixmap(index, (2, 2))
-                pixmap = pixmap.scaled(*self.previewSize(0),
-                                       transformMode=Qt.SmoothTransformation)
-            else:
-                pixmap = self.__engine.getPixmap(index, (2, 2))
-                pixmap = pixmap.scaled(*self.displaySize(0),
-                                       transformMode=Qt.SmoothTransformation)
+            pixmap = self.__engine.getPixmap(index, zoom)
         else:
             pixmap = self.__engine.getPixmap(index, zoom)
         return pixmap

@@ -261,6 +261,7 @@ class Validpoints(QObject):
 
 
 class ImgLabel(QLabel):
+
     def __init__(self, *args, **kwargs):
         edit_pixmap = kwargs.pop('edit_pixmap', None)
         super().__init__(*args, **kwargs)
@@ -271,7 +272,7 @@ class ImgLabel(QLabel):
         self.setContextMenuPolicy(Qt.CustomContextMenu)
         self.customContextMenuRequested.connect(self.contextMenu)
 
-    def setEditPixmap(self, pixmap):
+    def setEditPixmap(self, pixmap: bool):
         self.__edit_pixmap = pixmap
 
     def setEdit(self, flag):
@@ -336,7 +337,7 @@ class ImgLabel(QLabel):
             super().paintEvent(QPaintEvent)
 
     def drawPolicy(self, painter):
-        painter.drawPixmap(self.rect(), self.__edit_pixmap)
+        painter.drawPixmap(self.rect(), self.pixmap())
         if self.points.data:
             painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
             for index, point in enumerate(self.points.data, 1):
@@ -363,7 +364,6 @@ class DisplayLabel(ImgLabel):
         pdfwidget = kwargs.pop('pdfwidget', None)
         super().__init__(*args, **kwargs)
         self.__pdfwidget = pdfwidget
-        # self.metedata = {'index': -1}
 
     def mouseMoveEvent(self, QMouseEvent):
         if self.edited:  #???
@@ -527,6 +527,7 @@ class PreviewLabel(ImgLabel):
 
 
 class PreviewWidget(QWidget):
+    
     __slots__ = '__enter', 'selected', 'shadow', 'preview_label','layout'
 
     def __init__(self, index, pixmap, shadow=20):
@@ -552,7 +553,8 @@ class PreviewWidget(QWidget):
     def drawPolicy(self, painter):
         if self.__enter:
             path1 = QPainterPath()
-            path1.addRect(QRectF(self.rect()))
+            path1.addRoundedRect(QRectF(self.rect()), 10, 10)
+            # path1.addRect(QRectF(self.rect()))
             path2 = QPainterPath()
             path2.addRect(QRectF(self.preview_label.geometry()))
             painter.fillPath(path1 - path2, QColor(120, 120, 120, 80))
