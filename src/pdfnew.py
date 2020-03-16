@@ -118,7 +118,7 @@ class PdfWidget(Ui_Form, QWidget):
         self.label_2.setText('of 0')
         self.lineEdit_2.setText('0')
         self.listWidget.hide()
-        self.pushButton_4.hide()
+        self.pushButton_4.hide()  
         self.frame_2.hide()
         self.spacelabel.setFixedWidth(self.pdf_handle.screenSize[0] / 12 +
                                       self.pushButton_4.width())

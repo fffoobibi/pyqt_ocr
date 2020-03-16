@@ -4,11 +4,11 @@ from configparser import ConfigParser
 from os.path import exists, join, expanduser, isfile, abspath, isdir
 
 from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
-                             QApplication, QTextBrowser, QListView,
-                             QListWidgetItem, QHBoxLayout, QWidget)
+                             QPushButton, QApplication, QTextBrowser,
+                             QListView, QListWidgetItem, QHBoxLayout, QWidget)
 
 from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
-                         QFont, QPixmap, QFont, QPainterPath, QDrag,
+                         QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag,
                          QDragEnterEvent)
 
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread
@@ -261,7 +261,6 @@ class Validpoints(QObject):
 
 
 class ImgLabel(QLabel):
-
     def __init__(self, *args, **kwargs):
         edit_pixmap = kwargs.pop('edit_pixmap', None)
         super().__init__(*args, **kwargs)
@@ -527,8 +526,8 @@ class PreviewLabel(ImgLabel):
 
 
 class PreviewWidget(QWidget):
-    
-    __slots__ = '__enter', 'selected', 'shadow', 'preview_label','layout'
+
+    __slots__ = '__enter', 'selected', 'shadow', 'preview_label', 'layout'
 
     def __init__(self, index, pixmap, shadow=20):
         super().__init__()
@@ -569,3 +568,30 @@ class PreviewWidget(QWidget):
         super().leaveEvent(event)
         self.__enter = False
         self.update()
+
+
+class SideButton(QPushButton):
+    def __init__(self, *args, **kwargs):
+        attach = kwargs.pop('attach', None)
+        super().__init__(*args, **kwargs)
+        self.attach_object = attach or None
+        self.setCheckable(True)
+
+    def setAttach(self, qwidget):
+        self.attach_object = qwidget
+
+    def hidePolicy(self, me=False, attach_object=False):
+        self.setHidden(me)
+        if self.attach_object:
+            self.attach_object.setHidden(attach_object)
+
+    def iconPolicy(self,
+                   checked_pix: QPixmap = None,
+                   unchecked_pix: QPixmap = None):
+        def __(flag):
+            if flag:
+                self.setIcon(QIcon(checked_pix))
+            else:
+                self.setIcon(QIcon(unchecked_pix))
+
+        self.toggled.connect(__)
