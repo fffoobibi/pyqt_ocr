@@ -44,7 +44,7 @@
  [],
  False,
  False,
- 1584190221,
+ 1584325278,
  [('runw.exe',
    'c:\\users\\fqk12\\.virtualenvs\\src-rmgdjqc5\\lib\\site-packages\\PyInstaller\\bootloader\\Windows-64bit\\runw.exe',
    'EXECUTABLE')])

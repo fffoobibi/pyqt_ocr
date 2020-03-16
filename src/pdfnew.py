@@ -288,10 +288,6 @@ class PdfWidget(Ui_Form, QWidget):
             self.listWidget.setItemWidget(item, widget)
             QApplication.processEvents()
         self.listWidget.setCurrentRow(dis_index)
-
-        from guppy import hpy;hxx = hpy();heap = hxx.heap()
-        print(heap)
-        print(sys.getsizeof(self.listWidget))
         
 
     @slot(signal='clicked', sender='preview_label', desc='run in pdf_thread')
