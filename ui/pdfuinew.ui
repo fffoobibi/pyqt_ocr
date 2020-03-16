@@ -50,7 +50,7 @@
         <property name="frameShadow">
          <enum>QFrame::Raised</enum>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_6" stretch="0,0,0,8,0">
+        <layout class="QHBoxLayout" name="horizontalLayout_6" stretch="0,0,8,0">
          <property name="leftMargin">
           <number>0</number>
          </property>
@@ -74,31 +74,6 @@
            </property>
            <property name="checkable">
             <bool>true</bool>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="spacelabel">
-           <property name="sizePolicy">
-            <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-             <horstretch>0</horstretch>
-             <verstretch>0</verstretch>
-            </sizepolicy>
-           </property>
-           <property name="minimumSize">
-            <size>
-             <width>30</width>
-             <height>0</height>
-            </size>
-           </property>
-           <property name="baseSize">
-            <size>
-             <width>30</width>
-             <height>5</height>
-            </size>
-           </property>
-           <property name="text">
-            <string/>
            </property>
           </widget>
          </item>
@@ -248,7 +223,7 @@
            </property>
            <property name="sizeHint" stdset="0">
             <size>
-             <width>300</width>
+             <width>3000</width>
              <height>20</height>
             </size>
            </property>
@@ -523,7 +498,7 @@
           </widget>
          </item>
          <item>
-          <widget class="QTextBrowser" name="textBrowser">
+          <widget class="CTextBrowser" name="textBrowser">
            <property name="contextMenuPolicy">
             <enum>Qt::CustomContextMenu</enum>
            </property>
@@ -570,6 +545,11 @@ p, li { white-space: pre-wrap; }
    <class>SideButton</class>
    <extends>QPushButton</extends>
    <header location="global">customwidgets</header>
+  </customwidget>
+  <customwidget>
+   <class>CTextBrowser</class>
+   <extends>QTextBrowser</extends>
+   <header>customwidgets</header>
   </customwidget>
  </customwidgets>
  <resources>

@@ -15,26 +15,13 @@ from PyQt5.QtWidgets import QMessageBox, QApplication, QFileDialog
 from PyQt5.QtGui import QPixmap, QImage
 
 from supports import *
+from customwidgets import Validpoints
 from ruia_ocr import BaiduOcrService, BAIDU_ACCURATE_TYPE, BAIDU_HANDWRITING_TYPE, BAIDU_GENERAL_TYPE
 
 info_time = lambda: datetime.now().strftime('%H:%M:%S')
 save_name = lambda: datetime.now().strftime('%Y%m%d_%H_%M_%S')
 
 __all__ = ['PdfHandle', 'OcrHandle', 'ResultHandle']
-
-
-class BaseHandle(QObject):
-    @staticmethod
-    def slot(signal: str = '', desc='', sender=''):
-        def outer(func):
-            @wraps(func)
-            def inner(self, *args, **kwargs):
-                res = func(self, *args, **kwargs)
-                return res
-
-            return inner
-
-        return outer
 
 
 class Engine(object):
@@ -93,12 +80,12 @@ class Engine(object):
     def getPixmap(self, index, zoom=(1.0, 1.0)) -> QPixmap:
         if self.isPdf:
             x, y = zoom
-            pdf_pixmap = self.render[index].getPixmap(Matrix(2*x, 2*y))
+            pdf_pixmap = self.render[index].getPixmap(Matrix(2 * x, 2 * y))
             fmt = QImage.Format_RGBA8888 if pdf_pixmap.alpha else QImage.Format_RGB888
             pixmap = QPixmap.fromImage(
                 QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
                        pdf_pixmap.stride, fmt))
-            
+
             return pixmap
         else:
             pix = QPixmap(self.pagesView()[index])
@@ -145,7 +132,6 @@ class PdfHandle(QSingle):
         self.fake_pixmaps_indexes = []
         self.pixmaps_points = []
         self.select_state = []
-        self.edited_pdfs = []
 
         self.__pdf_preview = None
         self.__pdf_previewZoom = None
@@ -169,7 +155,7 @@ class PdfHandle(QSingle):
 
         self.__screenSize = None
         self.is_editing = False
-        
+
         self.__pdf_previewSize = None
         self.__pdf_previewZoom = None
         self.__pdf_displaySize = None
@@ -178,17 +164,16 @@ class PdfHandle(QSingle):
         self.pixmaps_indexes.clear()
         self.fake_pixmaps_indexes.clear()
         self.pixmaps_points.clear()
-        self.edited_pdfs.clear()
         self.select_state.clear()
-        
+
         try:
             self.__engine.close()
+        except AttributeError:
+            ...
         finally:
             self.__engine = None
             collect()
-
         self.clear_signal.emit()
-
 
     def setEngine(self, path):
         self.__engine = Engine(path)
@@ -224,7 +209,7 @@ class PdfHandle(QSingle):
                 self.__pageSizes = page_size
         return self.__pageSizes
 
-    def previewSize(self, index, shrink=12) -> Size: # 默认预览图片屏幕分辨率的1/12
+    def previewSize(self, index, shrink=12) -> Size:  # 默认预览图片屏幕分辨率的1/12
         if self.__engine.isPdf:
             if self.__pdf_previewSize is None:
                 p_width, p_height = self.pageSizes()[0]
@@ -267,8 +252,8 @@ class PdfHandle(QSingle):
         def auto_scaled(target):
             p_width, p_height = target
             d_width, d_height = self.screenSize
-            if (d_height * max_percent <=
-                    p_height) or (d_width * max_percent <= p_width):
+            if (d_height * max_percent <= p_height) or (d_width * max_percent
+                                                        <= p_width):
                 displayZoom = d_height * max_percent / p_height, d_height * max_percent / p_height
                 return displayZoom
             return 1.0, 1.0
@@ -280,7 +265,6 @@ class PdfHandle(QSingle):
                 self.__displayZooms = (diszoom
                                        for i in range(self.pageCount()))
                 self.__pdf_displayZoom = diszoom
-
 
             return self.__pdf_displayZoom
         if self.__displayZooms is None:
@@ -344,44 +328,41 @@ class PdfHandle(QSingle):
 
         self.pixmaps_indexes = render_indexes
         self.fake_pixmaps_indexes = render_indexes.copy()
-        self.pixmaps_points = [[[]] for points in range(len(self.pixmaps_indexes))]
+        self.pixmaps_points = [[[]]
+                               for points in range(len(self.pixmaps_indexes))]
         self.select_state = [True] * self.pageCount()
 
     def open(self, path) -> NoReturn:
         self.engined_counts += 1
-        self.edited_pdfs.append(path)
-
-        try:
-            if self.engined_counts == 1:
-                flag = False
-            else:
-                flag = self.__engine.target == self.edited_pdfs[-1]
-        except IndexError:
+        if self.engined_counts == 1:
             flag = False
-        finally:
-            if flag:
-                self.reload_signal.emit()  # 阻塞
-                if self.reload == QMessageBox.Yes:
-                    self.clear()
-                    self.setEngine(path)
-                    self.rendering()
-                    self.display_signal.emit(0, self.pixmaps_indexes)
-                    self.reload = QMessageBox.No
-            else:
+        else:
+            flag = self.__engine.target == path
+
+        if flag:
+            self.reload_signal.emit()  # 阻塞
+            if self.reload == QMessageBox.Yes:
                 self.clear()
                 self.setEngine(path)
                 self.rendering()
                 self.display_signal.emit(0, self.pixmaps_indexes)
+                self.reload = QMessageBox.No
+        else:
+            self.clear()
+            self.setEngine(path)
+            self.rendering()
+            self.display_signal.emit(0, self.pixmaps_indexes)
 
-    def tolocalPdf(self, pages: List[int]=None):
+    def tolocalPdf(self, pages: List[int] = None):
         base_name = basename(self.getEngine().target)
         pdf_name, file_types = QFileDialog.getSaveFileName(
-                None, 'pdf', join(home, base_name), 'PDF(*.pdf)')
+            None, 'pdf', join(home, base_name), 'PDF(*.pdf)')
         if pdf_name:
             if self.__engine.isPdf:
                 if pages is None:
                     pgs = []
-                    for state, index in zip(self.select_state, self.pixmaps_indexes):
+                    for state, index in zip(self.select_state,
+                                            self.pixmaps_indexes):
                         if state:
                             pgs.append(index)
                 else:
@@ -414,7 +395,7 @@ class OcrHandle(QSingle):
     ocr_signal = pyqtSignal(User)
     results_signal = pyqtSignal(object)
 
-    def __init__(self, pdf_handle: PdfHandle=None):
+    def __init__(self, pdf_handle: PdfHandle = None):
         super().__init__()
         self.pdf_handle = pdf_handle
         self.result_handle = ResultsHandle()
@@ -447,7 +428,8 @@ class OcrHandle(QSingle):
     def _ocrByindex(self, index=0, is_pdf=False):
         if self.pdf_handle.select_state[index] == True:
             points = self.pdf_handle.pixmaps_points[index]
-            region = self._parse_to_region(points) if points else None
+            region = self._parse_to_region(
+                Validpoints.adjustCoords(points)) if points else None
             pix = self.pdf_handle.renderPixmap(index)
             displaysize = self.pdf_handle.displaySize(index)
             img = self.pixmapToImage(pix, displaysize)
@@ -499,6 +481,7 @@ class OcrHandle(QSingle):
                     self._ocrByindex(int(true))
                 else:
                     for true_page_index in self.pdf_handle.fake_pixmaps_indexes:
-                        index = self.pdf_handle.pixmaps_indexes.index(true_page_index)
+                        index = self.pdf_handle.pixmaps_indexes.index(
+                            true_page_index)
                         self._ocrByindex(index, is_pdf=True)
                         self.thread().msleep(delay)
