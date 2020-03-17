@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import QWidget, QApplication, QListWidgetItem, QMessageBox, QFileDialog
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import QThread, QSize
+from PyQt5.QtGui import QIcon, QPixmap, QTransform
+from PyQt5.QtCore import QThread, QSize, Qt
 
 from os.path import isdir, exists, isfile
 from pdfuinew import Ui_Form
@@ -54,6 +54,39 @@ class PdfWidget(Ui_Form, QWidget):
         self.radioButton.toggled.connect(self.updateRadiostate)
         self.radioButton_2.toggled.connect(self.updateRadiostate)
         self.radioButton_3.toggled.connect(self.updateRadiostate)
+        self.pushButton_3.clicked.connect(self.rotatePixmap)
+
+    def rotatePixmap(self):
+        index = int(self.lineEdit_2.text()) - 1
+        shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
+
+        self.displayLabel.rotate()
+        self.displayLabel.points.clear()
+        self.displayLabel.points.points_signal.emit([])
+
+        previe_pixmap = self.pdf_handle.renderPixmap(
+            index, self.pdf_handle.previewZoom(index),
+            self.displayLabel._rotate_angle)
+
+        preview_width, preview_height = previe_pixmap.width(
+        ), previe_pixmap.height()
+        true_width = self.pdf_handle.screenSize[0] / self.pdf_handle.PRE_SHRINK
+        scaled = true_width / preview_width
+        preview_height = preview_height * scaled
+
+        true_pix = previe_pixmap.scaled(true_width,
+                                        preview_height,
+                                        transformMode=Qt.SmoothTransformation)
+
+        widget = self.get_item_widget(true_pix, index)
+        itemsize = QSize(true_width + shadow_width * 2,
+                         preview_height + shadow_width * 2)
+        widget.preview_label.setFixedSize(QSize(true_width, preview_height))
+        widget.setFixedHeight(itemsize.height())
+
+        self.listWidget.insertItemWidget(index + 1, itemsize, widget)
+        self.listWidget.takeItemWidget(index)
+        self.listWidget.update()
 
     @slot(signal='toggled', sender='radioButtons')
     def updateRadiostate(self, state):
@@ -131,7 +164,6 @@ class PdfWidget(Ui_Form, QWidget):
         self.lineEdit_2.setText('0')
         self.frame_2.hide()
 
-
     @slot(signal='open_signal', sender='')
     def render_pdf(self):
         # self.pdf_handle.setEngine(self._work_path())
@@ -150,7 +182,8 @@ class PdfWidget(Ui_Form, QWidget):
     def clear_infos(self):
         self.listWidget.clear()
         self.displayLabel.points.clear()
-        import gc;gc.collect()
+        import gc
+        gc.collect()
 
     @slot(signal='reload_signal', sender='')
     def reload(self):
@@ -191,7 +224,8 @@ class PdfWidget(Ui_Form, QWidget):
         preview_label.update()
 
     def get_item_widget(self, pixmap, index):
-        shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
+        shadow_width = self.pdf_handle.screenSize[
+            0] / self.pdf_handle.PRE_SCREEN_SHRINK / self.pdf_handle.PRE_SHADOW_SHRINK
         widget = PreviewWidget(index, pixmap, shadow_width)
         widget.preview_label.clicked.connect(self.displayPdfPage)
         widget.preview_label.reset_signal.connect(self.resetListWidget)
@@ -202,11 +236,12 @@ class PdfWidget(Ui_Form, QWidget):
     def resetListWidget(self):
         self.listWidget.indexes = self.pdf_handle.pixmaps_indexes.copy()
         self.pdf_handle.fake_pixmaps_indexes = self.listWidget.indexes  # 重要
-        self.pdf_handle.select_state = [True] * len(self.pdf_handle.pixmaps_indexes)
+        self.pdf_handle.select_state = [True] * len(
+            self.pdf_handle.pixmaps_indexes)
 
         self.updatePageCheckState(0)
         self.updateRadioState()
-        
+
         self.listWidget.clear()
         self.pdf_handle.display_signal.emit(0, self.pdf_handle.pixmaps_indexes)
         for index, label_points in enumerate(self.pdf_handle.pixmaps_points):
@@ -228,13 +263,14 @@ class PdfWidget(Ui_Form, QWidget):
         display_zoom = self.pdf_handle.displayZoom(dis_index)
         display_pixmap = self.pdf_handle.renderPixmap(dis_index, display_zoom)
 
-
         self.label_2.setText('of %s' % self.pdf_handle.pageCount())
         self.lineEdit_2.setText(str(dis_index + 1))
 
-        self.listWidget.setFixedWidth(preview_width + shadow_width * 2 + 10 * 2 + 20)
+        self.listWidget.setFixedWidth(preview_width + shadow_width * 2 +
+                                      10 * 2 + 20)
         self.displayLabel.setPixmap(display_pixmap)
-        self.displayLabel.setEditPixmap(True)
+        # self.displayLabel.setEditPixmap(True)
+        self.displayLabel.setEditPixmap(display_pixmap)
         self.displayLabel.setEdit(True)
         self.displayLabel.show()
         self.filelabel.setText(engine.getName(dis_index))
@@ -246,11 +282,13 @@ class PdfWidget(Ui_Form, QWidget):
         self.listWidget.indexes = self.pdf_handle.pixmaps_indexes.copy()
         self.pdf_handle.fake_pixmaps_indexes = self.listWidget.indexes  # 重要
 
-        for index in list_widget_indexes:
-            pix = self.pdf_handle.renderPixmap(index, self.pdf_handle.previewZoom(index))
+        for index, rotate in zip(list_widget_indexes, self.pdf_handle.rotates):
+            pix = self.pdf_handle.renderPixmap(
+                index, self.pdf_handle.previewZoom(index), rotate)
             widget = self.get_item_widget(pix, index)
             preview_width, preview_height = self.pdf_handle.previewSize(index)
-            itemsize = QSize(preview_width + shadow_width * 2, preview_height + shadow_width * 2)
+            itemsize = QSize(preview_width + shadow_width * 2,
+                             preview_height + shadow_width * 2)
             self.listWidget.addWidgetItem(itemsize, widget)
             QApplication.processEvents()
 

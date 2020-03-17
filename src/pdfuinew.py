@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'pdfuinew.ui'
+# Form implementation generated from reading ui file '.\pdfuinew.ui'
 #
 # Created by: PyQt5 UI code generator 5.13.0
 #
@@ -36,7 +36,8 @@ class Ui_Form(object):
         self.horizontalLayout_6.setObjectName("horizontalLayout_6")
         self.sideButton = SideButton(self.frame_8)
         self.sideButton.setText("")
-        icon1 = QtGui.QIcon(":/image/img/indent-decrease.svg")
+        icon1 = QtGui.QIcon()
+        icon1.addPixmap(QtGui.QPixmap(":/image/img/indent-decrease.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.sideButton.setIcon(icon1)
         self.sideButton.setCheckable(True)
         self.sideButton.setObjectName("sideButton")
@@ -118,8 +119,10 @@ class Ui_Form(object):
         self.horizontalLayout_6.addItem(spacerItem)
         self.sideButton_2 = SideButton(self.frame_8)
         self.sideButton_2.setText("")
-        icon2 = QtGui.QIcon(":/image/img/indent-increase.svg")
+        icon2 = QtGui.QIcon()
+        icon2.addPixmap(QtGui.QPixmap(":/image/img/indent-increase.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         self.sideButton_2.setIcon(icon2)
+        self.sideButton_2.setIconSize(QtCore.QSize(18, 18))
         self.sideButton_2.setCheckable(True)
         self.sideButton_2.setObjectName("sideButton_2")
         self.horizontalLayout_6.addWidget(self.sideButton_2)
@@ -191,6 +194,13 @@ class Ui_Form(object):
         self.checkBox.setText("")
         self.checkBox.setObjectName("checkBox")
         self.horizontalLayout_4.addWidget(self.checkBox)
+        self.pushButton_3 = QtWidgets.QPushButton(self.infoFrame)
+        self.pushButton_3.setText("")
+        icon3 = QtGui.QIcon()
+        icon3.addPixmap(QtGui.QPixmap(":/image/img/spinner.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        self.pushButton_3.setIcon(icon3)
+        self.pushButton_3.setObjectName("pushButton_3")
+        self.horizontalLayout_4.addWidget(self.pushButton_3)
         spacerItem6 = QtWidgets.QSpacerItem(2000, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout_4.addItem(spacerItem6)
         self.verticalLayout.addWidget(self.infoFrame)

@@ -1,7 +1,7 @@
 import datetime
+import gc
 from os import listdir
 from functools import wraps
-from gc import collect
 from datetime import datetime
 from typing import List, NoReturn
 
@@ -12,7 +12,7 @@ from os.path import isfile, exists, isdir, abspath, join, basename
 
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QThread, QMutex
 from PyQt5.QtWidgets import QMessageBox, QApplication, QFileDialog
-from PyQt5.QtGui import QPixmap, QImage
+from PyQt5.QtGui import QPixmap, QImage, QTransform
 
 from supports import *
 from customwidgets import Validpoints
@@ -47,6 +47,7 @@ class Engine(object):
             self.render_type = 'file'
 
         self.__pagesView = None
+        self.__transform = QTransform()
         self.target = path
 
     def getName(self, index) -> str:
@@ -77,7 +78,7 @@ class Engine(object):
             return self.render.pageCount
         return len(self.pagesView())
 
-    def getPixmap(self, index, zoom=(1.0, 1.0)) -> QPixmap:
+    def getPixmap(self, index, zoom=(1.0, 1.0), rotate=None) -> QPixmap:
         if self.isPdf:
             x, y = zoom
             pdf_pixmap = self.render[index].getPixmap(Matrix(2 * x, 2 * y))
@@ -85,22 +86,25 @@ class Engine(object):
             pixmap = QPixmap.fromImage(
                 QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
                        pdf_pixmap.stride, fmt))
-
-            return pixmap
         else:
             pix = QPixmap(self.pagesView()[index])
             width, height = pix.width(), pix.height()
-            pix = pix.scaled(width * zoom[0],
+            pixmap = pix.scaled(width * zoom[0],
                              height * zoom[1],
                              transformMode=Qt.SmoothTransformation)
-            return pix
+        if not rotate:
+            return pixmap
+        else:
+            pixmap = pixmap.transformed(self.__transform.rotate(rotate), Qt.SmoothTransformation)
+            self.__transform.reset()
+            return pixmap
 
     def close(self):
         if self.isPdf:
             self.render.close()
         self.render = None
         self.__pagesView = None
-        collect()
+        gc.collect()
 
     def __getitem__(self, index) -> QPixmap:
         return self.getPixmap(index)
@@ -110,7 +114,10 @@ class Engine(object):
 
 
 class PdfHandle(QObject):
-    _lock = QMutex(QMutex.Recursive)
+    
+    PRE_SCREEN_SHRINK = 12 # 预览图片宽度占据屏幕的1/12
+    PRE_SHADOW_SHRINK = 14  # 阴影占据preview图片宽度的1/14
+
     open_signal = pyqtSignal()
     display_signal = pyqtSignal(int, list)  # dis_index, showindexes
     reload_signal = pyqtSignal()
@@ -143,6 +150,7 @@ class PdfHandle(QObject):
         self.__displayZooms: list = None
         self.__displaySizes: list = None
         self.__pageSizes: list = None
+        self.rotates : list = None
 
         self.save_signal.connect(self.tolocalPdf)
 
@@ -152,6 +160,7 @@ class PdfHandle(QObject):
         self.__displayZooms: list = None
         self.__displaySizes: list = None
         self.__pageSizes: list = None
+        self.rotates: list = None
 
         self.__screenSize = None
         self.is_editing = False
@@ -172,7 +181,7 @@ class PdfHandle(QObject):
             ...
         finally:
             self.__engine = None
-            collect()
+            gc.collect()
         self.clear_signal.emit()
 
     def setEngine(self, path):
@@ -209,12 +218,12 @@ class PdfHandle(QObject):
                 self.__pageSizes = page_size
         return self.__pageSizes
 
-    def previewSize(self, index, shrink=12) -> Size:  # 默认预览图片屏幕分辨率的1/12
+    def previewSize(self, index) -> Size:  # 默认预览图片屏幕分辨率的1/12
         if self.__engine.isPdf:
             if self.__pdf_previewSize is None:
                 p_width, p_height = self.pageSizes()[0]
                 d_width, d_height = self.screenSize
-                zoom_width = d_width / shrink
+                zoom_width = d_width / self.PRE_SCREEN_SHRINK
                 zoom_height = p_height / p_width * zoom_width
                 self.__pdf_previewSize = round(zoom_width,
                                                0), round(zoom_height, 0)
@@ -231,11 +240,11 @@ class PdfHandle(QObject):
                 self.__previewSizes = temp
             return self.__previewSizes[index]
 
-    def previewZoom(self, index, shrink=12) -> Zoom:
+    def previewZoom(self, index) -> Zoom:
         if self.__engine.isPdf:
             if self.__pdf_previewZoom is None:
                 p_width, p_height = self.pageSizes()[0]
-                width, height = self.previewSize(0, shrink)
+                width, height = self.previewSize(0)
                 self.__pdf_previewZoom = width / p_width, width / p_width
             return self.__pdf_previewZoom
         else:
@@ -305,20 +314,17 @@ class PdfHandle(QObject):
     def renderPixmap(self,
                      index,
                      zoom=(1, 1),
-                     *,
-                     pdf_zoom: Zoom = None,
-                     pdf_prezoom: bool = False) -> QPixmap:
-        if self.__engine.isPdf:
-            pixmap = self.__engine.getPixmap(index, zoom)
-        else:
-            pixmap = self.__engine.getPixmap(index, zoom)
-        return pixmap
+                     rotate=None) -> QPixmap:
+     
+        return self.__engine.getPixmap(index, zoom, rotate)
 
     def rendering(self) -> NoReturn:
         self.is_editing = True
         render_indexes = []
         for index in range(self.pageCount()):
             render_indexes.append(index)
+
+        length = len(render_indexes)
 
         self.pageSizes()
         self.displaySize(0)
@@ -328,9 +334,9 @@ class PdfHandle(QObject):
 
         self.pixmaps_indexes = render_indexes
         self.fake_pixmaps_indexes = render_indexes.copy()
-        self.pixmaps_points = [[[]]
-                               for points in range(len(self.pixmaps_indexes))]
-        self.select_state = [True] * self.pageCount()
+        self.pixmaps_points = [[[]]] * length
+        self.rotates = [False] * length
+        self.select_state = [True] * length
 
     def open(self, path) -> NoReturn:
         self.engined_counts += 1

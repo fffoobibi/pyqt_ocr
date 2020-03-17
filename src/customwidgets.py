@@ -7,7 +7,7 @@ from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
                              QPushButton, QApplication, QTextBrowser, QDialog,
                              QListView, QListWidgetItem, QHBoxLayout, QWidget)
 from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
-                         QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag,
+                         QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag, QTransform, 
                          QDragEnterEvent)
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread, QTime
 
@@ -284,6 +284,17 @@ class DragListWidget(QListWidget):
         item = self.item(index)
         return self.itemWidget(item)
 
+    def insertItemWidget(self, index, itemsize, widget):
+        item = QListWidgetItem()
+        item.setSizeHint(itemsize)
+        self.insertItem(index, item)
+        self.setItemWidget(item, widget)
+
+    def takeItemWidget(self, index):
+        item = self.item(index)
+        self.removeItemWidget(item)
+        self.takeItem(index)
+
     def sortWidgetItems(self): ###待完善
         # widgets = [0] * len(self.indexes)
         for count, index in enumerate(self.indexes):
@@ -293,7 +304,6 @@ class DragListWidget(QListWidget):
             self.removeItemWidget(item)
             self.setItemWidget(item, widget)
         # self.indexes.sort()
-
 
 
 class DragLineEdit(QLineEdit):
@@ -503,7 +513,8 @@ class ImgLabel(QLabel):
             super().paintEvent(QPaintEvent)
 
     def drawPolicy(self, painter):
-        painter.drawPixmap(self.rect(), self.pixmap())
+        # painter.drawPixmap(self.rect(), self.pixmap())
+        painter.drawPixmap(0, 0, self.__edit_pixmap)
         if self.points.data:
             painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
             for index, point in enumerate(self.points.data, 1):
@@ -530,6 +541,9 @@ class DisplayLabel(ImgLabel):
         parent_widget = kwargs.pop('parent_widget', None)
         super().__init__(*args, **kwargs)
         self.__pdfwidget = parent_widget
+        self._rotate_count = 0
+        self._rotate_angle = 0
+        self.is_editing = False
 
     def mouseMoveEvent(self, QMouseEvent):
         if self.edited:  #???
@@ -538,12 +552,43 @@ class DisplayLabel(ImgLabel):
                         QMouseEvent.pos()):
                 self.points[-1][-2:] = [QMouseEvent.x(), QMouseEvent.y()]
                 self.points.points_signal.emit(self.points.data)
+                self.is_editing = True
                 self.update()
         else:
             super().mouseMoveEvent(QMouseEvent)
+            self.is_editing = False
 
     def getPdfWidget(self):
         return self.__pdfwidget
+
+    def rotate(self, angle=90):
+        self._rotate_angle += angle
+        transform  = QTransform()
+        transform.rotate(angle)
+        pix = self.pixmap().transformed(transform, Qt.SmoothTransformation)
+        self.setPixmap(pix)
+    
+    def drawPolicy(self, painter):
+        painter.drawPixmap(0, 0, self.pixmap())
+        if self.points.data:
+            painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
+            for index, point in enumerate(self.points.data, 1):
+                x1, y1, x2, y2 = point
+                msg = str(index)
+                w, h = abs(x2 - x1), abs(y2 - y1)
+                if (x2 - x1) > 0 and (y2 - y1) > 0:
+                    painter.drawRect(x1, y1, w, h)  # 右下方滑动
+                    painter.drawText(x1, y1 - 4, msg)
+                elif (x2 - x1) > 0 and (y2 - y1) < 0:
+                    painter.drawRect(x1, y1 - h, w, h)  # 右上方滑动
+                    painter.drawText(x1, y2 - 4, msg)
+
+                elif (x2 - x1) < 0 and (y2 - y1) > 0:
+                    painter.drawRect(x1 - w, y1, w, h)  # 左下方滑动
+                    painter.drawText(x2, y1 - 4, msg)
+                else:
+                    painter.drawRect(x2, y1 - h, w, h)  # 左上方滑动
+                    painter.drawText(x2, y2 - 4, msg)
 
     def filePolicy(self):
         menu = QMenu(self)
