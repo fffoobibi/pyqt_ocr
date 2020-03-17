@@ -10,7 +10,7 @@ from fitz import Matrix
 from fitz import open as pdf_open
 from os.path import isfile, exists, isdir, abspath, join, basename
 
-from PyQt5.QtCore import QObject, pyqtSignal, Qt, QThread
+from PyQt5.QtCore import QObject, pyqtSignal, Qt, QThread, QMutex
 from PyQt5.QtWidgets import QMessageBox, QApplication, QFileDialog
 from PyQt5.QtGui import QPixmap, QImage
 
@@ -109,8 +109,8 @@ class Engine(object):
         return f'Engine<{self.target}>'
 
 
-class PdfHandle(QSingle):
-
+class PdfHandle(QObject):
+    _lock = QMutex(QMutex.Recursive)
     open_signal = pyqtSignal()
     display_signal = pyqtSignal(int, list)  # dis_index, showindexes
     reload_signal = pyqtSignal()
@@ -390,7 +390,9 @@ class ResultsHandle():
             return results, False
 
 
-class OcrHandle(QSingle):
+class OcrHandle(QObject):
+
+    # _lock = QMutex()
 
     ocr_signal = pyqtSignal(User)
     results_signal = pyqtSignal(object)
@@ -425,7 +427,7 @@ class OcrHandle(QSingle):
         image = ImageQt.fromqimage(qimage)
         return image
 
-    def _ocrByindex(self, index=0, is_pdf=False):
+    def _ocrByindex(self, index, user, is_pdf=False):
         if self.pdf_handle.select_state[index] == True:
             points = self.pdf_handle.pixmaps_points[index]
             region = self._parse_to_region(
@@ -440,6 +442,7 @@ class OcrHandle(QSingle):
             self.results_signal.emit(
                 f'<p style="font-weight:bold;color:purple">[{info_time()}] {msg}:</p>'
             )
+            service = user.config.get('recognition', 'type', int)
             json = self.ocr_service.request(region=region, img=img)
             res, flag = self.result_handle.process(json)
             emit_res = '\n'.join(res)
@@ -447,6 +450,15 @@ class OcrHandle(QSingle):
                 self.results_signal.emit(
                     f'<pre style="white-space:pre-wrap;">{emit_res}</pre>')
                 self.latest_result[-1] = emit_res
+                if service == 0:
+                    user.config.info['parseinfo']['accurate'] += 1
+                elif service == 1:
+                    user.config.info['parseinfo']['basic'] += 1
+                elif service == 2:
+                    user.config.info['parseinfo']['handwriting'] += 1
+                user.sync(Account())
+                print(Account().active_user().config.info['parseinfo'])
+
             else:
                 self.results_signal.emit(str(json))
                 self.latest_result[-1] = str(json)
@@ -462,7 +474,7 @@ class OcrHandle(QSingle):
                 service_type = BAIDU_GENERAL_TYPE
             elif service == '1':
                 service_type = BAIDU_ACCURATE_TYPE
-            else:
+            elif service == '2':
                 service_type = BAIDU_HANDWRITING_TYPE
 
             self.ocr_service = BaiduOcrService(user.id,
@@ -473,15 +485,15 @@ class OcrHandle(QSingle):
             render_type = self.pdf_handle.getEngine().render_type
 
             if render_type == 'file':
-                self._ocrByindex(0)
+                self._ocrByindex(0, user)
             elif render_type == 'pdf' or render_type == 'dir':
                 if self.workpath[:9] == '---此页---:':
                     true, current_text = self.workpath[9:].split(':')
                     self.workpath = f'page_{current_text}'
-                    self._ocrByindex(int(true))
+                    self._ocrByindex(int(true), user)
                 else:
                     for true_page_index in self.pdf_handle.fake_pixmaps_indexes:
                         index = self.pdf_handle.pixmaps_indexes.index(
                             true_page_index)
-                        self._ocrByindex(index, is_pdf=True)
+                        self._ocrByindex(index, user, is_pdf=True)
                         self.thread().msleep(delay)

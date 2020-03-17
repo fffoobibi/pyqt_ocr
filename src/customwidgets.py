@@ -284,7 +284,7 @@ class DragListWidget(QListWidget):
         item = self.item(index)
         return self.itemWidget(item)
 
-    def sortWidgetItems(self):
+    def sortWidgetItems(self): ###待完善
         # widgets = [0] * len(self.indexes)
         for count, index in enumerate(self.indexes):
             item = self.item(count)
@@ -579,7 +579,8 @@ class DisplayLabel(ImgLabel):
         a5 = menu.addAction('复制结果')
         action = menu.exec_(QCursor.pos())
         pdfwidget = self.getPdfWidget()
-        activeuser = pdfwidget.account.active_user()
+        # activeuser = pdfwidget.account.active_user()
+        activeuser = Account().active_user()
         if action == a1:
             self.points.clear()
             self.points.points_signal.emit([])

@@ -1,4 +1,6 @@
 import json
+import inspect
+
 
 from typing import *
 from configparser import ConfigParser
@@ -16,7 +18,7 @@ Region = 'x1,y1,x2,y2;...'
 
 __all__ = [
     'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size',
-    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'QSingle', 'NoReturn'
+    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'Single', 'QSingle', 'NoReturn'
 ]
 
 home = abspath(expanduser('~\\Desktop')) if exists(
@@ -147,6 +149,52 @@ class Config(object):
 DEFAULT_CONFIG = Config.fromDict(DEFAULT_SETTINGS)
 
 
+class Single(object):
+
+    _lock = QMutex()
+
+    def __new__(cls, *args, **kwargs):
+        cls._lock.lock()
+        if not hasattr(cls, '_instance'):
+            cls._instance = object.__new__(cls)
+            cls._instance.__inited__ = False
+            cls.__init__ = cls.singleinit(cls.__init__)
+        cls._lock.unlock()
+        return cls._instance
+
+    @classmethod
+    def singleinit(cls, func):
+        def inner(*args, **kwargs):
+            cls._lock.lock()
+            if getattr(cls._instance, '__inited__') == False:
+                func(*args, **kwargs)
+                cls._instance.__inited__ = True
+            cls._lock.unlock()
+
+        return inner
+
+
+class MetaThreadSafe(type):
+    def __new__(cls, class_name, class_base, class_dict):
+        class_ = type.__new__(cls, class_name, class_base, class_dict)
+        # class_._lock = QMutex(QMutex.Recursive)
+        for key in class_dict:
+            if inspect.isfunction(class_dict[key]):
+                if key != '__init__':
+                    method = cls.thread_safe(class_, class_dict[key])
+                    setattr(class_, key, method)
+        return class_
+
+    def thread_safe(self, func):
+        def inner(*args, **kwargs):
+            try:
+                self._lock.lock()
+                res = func(*args, **kwargs)
+                return res
+            finally:
+                self._lock.unlock()
+        return inner
+
 class QSingle(QObject):
 
     _lock = QMutex()
@@ -171,12 +219,15 @@ class QSingle(QObject):
 
         return inner
 
-
-class Account(QSingle):
+class Account(Single, metaclass=MetaThreadSafe):
+    
+    _lock = QMutex(QMutex.Recursive)
+    
     def __init__(self):
         super().__init__()
         self.file_path = abspath(join(expanduser('~'), 'ocr_user.json'))
         self.reload()
+        print(1111, 'init')
 
     def reload(self) -> NoReturn:
         if not exists(self.file_path):
@@ -230,11 +281,10 @@ class Account(QSingle):
             json.dump(self.info, file, ensure_ascii=False, indent='  ')
 
 
-class User(object):
+class User(Single, metaclass=MetaThreadSafe):
 
+    _lock = QMutex(QMutex.Recursive)
     __users__ = []
-    _lock = QMutex()
-
 
     @classmethod
     def fromDict(cls, dic) -> 'User':
@@ -296,7 +346,6 @@ class User(object):
         self.config.pop('temporal')
         account.add_user(self)
 
-   
     def to_dict(self) -> Dict:
         config = self.config.to_dict()
         config.pop('temporal', None)
@@ -312,3 +361,24 @@ class User(object):
 
     def __repr__(self):
         return f'User<alias:{self.alias}, ...>'
+
+def mainTest():
+
+    a = Account()
+    b = Account()
+    c = Account()
+
+    print(id(a), id(b), id(c))
+
+    u = Account().active_user()
+    u.config.info['parseinfo']['basic'] += 1
+    u.config.info['parseinfo']['basic'] += 1
+    print(u.config.info)
+    # u.sync(Account())
+    print('-'*20)
+    print(Account().active_user().config.info)
+
+    
+
+if __name__ == "__main__":
+    mainTest()
