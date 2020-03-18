@@ -58,7 +58,8 @@ class PdfWidget(Ui_Form, QWidget):
 
     def rotatePixmap(self):
         index = int(self.lineEdit_2.text()) - 1
-        shadow_width = self.pdf_handle.screenSize[0] / 12 / 14
+        shadow_width = self.pdf_handle.screenSize[
+            0] / self.pdf_handle.PRE_SCREEN_SHRINK / self.pdf_handle.PRE_SHADOW_SHRINK
 
         self.displayLabel.rotate()
         self.displayLabel.points.clear()
@@ -68,25 +69,13 @@ class PdfWidget(Ui_Form, QWidget):
             index, self.pdf_handle.previewZoom(index),
             self.displayLabel._rotate_angle)
 
-        preview_width, preview_height = previe_pixmap.width(
-        ), previe_pixmap.height()
-        true_width = self.pdf_handle.screenSize[0] / self.pdf_handle.PRE_SHRINK
-        scaled = true_width / preview_width
-        preview_height = preview_height * scaled
+        true_pix = self.pdf_handle.scaledPixmaptoPreview(previe_pixmap)
+        itemsize = QSize(true_pix.width() + shadow_width * 2,
+                         true_pix.height() + shadow_width * 2)
+        preview_widget = self.listWidget.updateItemPreview(index, itemsize, true_pix)
+        preview_widget.preview_label.clicked.connect(self.displayPdfPage)
+        preview_widget.preview_label.reset_signal.connect(self.resetListWidget)
 
-        true_pix = previe_pixmap.scaled(true_width,
-                                        preview_height,
-                                        transformMode=Qt.SmoothTransformation)
-
-        widget = self.get_item_widget(true_pix, index)
-        itemsize = QSize(true_width + shadow_width * 2,
-                         preview_height + shadow_width * 2)
-        widget.preview_label.setFixedSize(QSize(true_width, preview_height))
-        widget.setFixedHeight(itemsize.height())
-
-        self.listWidget.insertItemWidget(index + 1, itemsize, widget)
-        self.listWidget.takeItemWidget(index)
-        self.listWidget.update()
 
     @slot(signal='toggled', sender='radioButtons')
     def updateRadiostate(self, state):
@@ -224,8 +213,7 @@ class PdfWidget(Ui_Form, QWidget):
         preview_label.update()
 
     def get_item_widget(self, pixmap, index):
-        shadow_width = self.pdf_handle.screenSize[
-            0] / self.pdf_handle.PRE_SCREEN_SHRINK / self.pdf_handle.PRE_SHADOW_SHRINK
+        shadow_width = self.pdf_handle.shadowWidth()
         widget = PreviewWidget(index, pixmap, shadow_width)
         widget.preview_label.clicked.connect(self.displayPdfPage)
         widget.preview_label.reset_signal.connect(self.resetListWidget)
@@ -257,7 +245,7 @@ class PdfWidget(Ui_Form, QWidget):
                          list_widget_indexes: list):  # 槽函数
 
         engine = self.pdf_handle.getEngine()
-        shadow_width = self.pdf_handle.screenSize[dis_index] / 12 / 14
+        shadow_width = self.pdf_handle.shadowWidth()
         preview_width, preview_height = self.pdf_handle.previewSize(dis_index)
         preview_zoom = self.pdf_handle.previewZoom(dis_index)
         display_zoom = self.pdf_handle.displayZoom(dis_index)
@@ -289,7 +277,7 @@ class PdfWidget(Ui_Form, QWidget):
             preview_width, preview_height = self.pdf_handle.previewSize(index)
             itemsize = QSize(preview_width + shadow_width * 2,
                              preview_height + shadow_width * 2)
-            self.listWidget.addWidgetItem(itemsize, widget)
+            self.listWidget.addItemWidget(itemsize, widget)
             QApplication.processEvents()
 
         self.listWidget.setCurrentRow(dis_index)

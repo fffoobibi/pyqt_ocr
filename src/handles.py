@@ -4,6 +4,7 @@ from os import listdir
 from functools import wraps
 from datetime import datetime
 from typing import List, NoReturn
+from dataclasses import dataclass
 
 from PIL import Image, ImageQt
 from fitz import Matrix
@@ -90,12 +91,13 @@ class Engine(object):
             pix = QPixmap(self.pagesView()[index])
             width, height = pix.width(), pix.height()
             pixmap = pix.scaled(width * zoom[0],
-                             height * zoom[1],
-                             transformMode=Qt.SmoothTransformation)
+                                height * zoom[1],
+                                transformMode=Qt.SmoothTransformation)
         if not rotate:
             return pixmap
         else:
-            pixmap = pixmap.transformed(self.__transform.rotate(rotate), Qt.SmoothTransformation)
+            pixmap = pixmap.transformed(self.__transform.rotate(rotate),
+                                        Qt.SmoothTransformation)
             self.__transform.reset()
             return pixmap
 
@@ -112,10 +114,17 @@ class Engine(object):
     def __repr__(self):
         return f'Engine<{self.target}>'
 
+@dataclass
+class PageState(object):
+    page_index: int = -1
+    fake_page_index: int = -1
+    rotate: int = 0
+    select_state: bool = False
+    rect_coords: List[List[int]] = [[]]
 
 class PdfHandle(QObject):
-    
-    PRE_SCREEN_SHRINK = 12 # 预览图片宽度占据屏幕的1/12
+
+    PRE_SCREEN_SHRINK = 12  # 预览图片宽度占据屏幕的1/12
     PRE_SHADOW_SHRINK = 14  # 阴影占据preview图片宽度的1/14
 
     open_signal = pyqtSignal()
@@ -125,9 +134,24 @@ class PdfHandle(QObject):
     ocr_signal = pyqtSignal(list, list)
     save_signal = pyqtSignal(object)
 
+    def scaledPixmaptoPreview(self, pixmap) -> QPixmap:
+        p_width, p_height = pixmap.width(), pixmap.height()
+        true_width = self.screenSize[0] / self.PRE_SCREEN_SHRINK
+        scaled = true_width / p_width
+        p_height = p_height * scaled
+        scaled_pix = pixmap.scaled(true_width, p_height, transformMode=Qt.SmoothTransformation)
+        return scaled_pix
+
+    def shadowWidth(self):
+        if self.__shadowWidth is None:
+            self.__shadowWidth = self.screenSize[
+                0] / self.PRE_SCREEN_SHRINK / self.PRE_SHADOW_SHRINK
+        return self.__shadowWidth
+
     def __init__(self):
         super().__init__()
         self.__screenSize = None
+        self.__shadowWidth = None
         self.__engine = None
 
         self.reload = QMessageBox.No
@@ -140,6 +164,8 @@ class PdfHandle(QObject):
         self.pixmaps_points = []
         self.select_state = []
 
+        self.page_states: List[PageState] = []
+
         self.__pdf_preview = None
         self.__pdf_previewZoom = None
         self.__pdf_displaySize = None
@@ -150,7 +176,7 @@ class PdfHandle(QObject):
         self.__displayZooms: list = None
         self.__displaySizes: list = None
         self.__pageSizes: list = None
-        self.rotates : list = None
+        self.rotates: list = None
 
         self.save_signal.connect(self.tolocalPdf)
 
@@ -163,6 +189,7 @@ class PdfHandle(QObject):
         self.rotates: list = None
 
         self.__screenSize = None
+        self.__shadowWidth = None
         self.is_editing = False
 
         self.__pdf_previewSize = None
@@ -311,11 +338,8 @@ class PdfHandle(QObject):
     def pageCount(self) -> int:
         return self.__engine.pageCount()
 
-    def renderPixmap(self,
-                     index,
-                     zoom=(1, 1),
-                     rotate=None) -> QPixmap:
-     
+    def renderPixmap(self, index, zoom=(1, 1), rotate=None) -> QPixmap:
+
         return self.__engine.getPixmap(index, zoom, rotate)
 
     def rendering(self) -> NoReturn:
@@ -337,6 +361,10 @@ class PdfHandle(QObject):
         self.pixmaps_points = [[[]]] * length
         self.rotates = [False] * length
         self.select_state = [True] * length
+
+        for index in render_indexes:
+            pagestate = PageState(index, index, 0, True, [[]])
+            self.page_states.append(pagestate)
 
     def open(self, path) -> NoReturn:
         self.engined_counts += 1

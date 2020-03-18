@@ -7,8 +7,8 @@ from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
                              QPushButton, QApplication, QTextBrowser, QDialog,
                              QListView, QListWidgetItem, QHBoxLayout, QWidget)
 from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
-                         QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag, QTransform, 
-                         QDragEnterEvent)
+                         QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag,
+                         QTransform, QDragEnterEvent)
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread, QTime
 
 from ruia_ocr import (BaiduOcrService, get_file_paths, BAIDU_ACCURATE_TYPE,
@@ -179,6 +179,7 @@ class CTextBrowser(QTextBrowser):
 class DragListWidget(QListWidget):
     drag_item = None
     target_item = None
+    MARGINES = 10
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -218,15 +219,6 @@ class DragListWidget(QListWidget):
                 else:
                     pass
 
-    def _renderItemWidget(self, row, qsize, widget):
-        item = QListWidgetItem()
-        item.setSizeHint(qsize)
-        if row == -1:
-            self.addItem(item)
-        else:
-            self.insertItem(row, item)
-        self.setItemWidget(item, widget)
-
     def dragEnterEvent(self, QDragEnterEvent: QDragEnterEvent):
         if self.drag_item:
             if QDragEnterEvent.source():
@@ -239,6 +231,15 @@ class DragListWidget(QListWidget):
         QDragMoveEvent.setDropAction(Qt.MoveAction)
         QDragMoveEvent.accept()
 
+    def _renderItemWidget(self, row, qsize, widget):
+        item = QListWidgetItem()
+        item.setSizeHint(qsize)
+        if row == -1:
+            self.addItem(item)
+        else:
+            self.insertItem(row, item)
+        self.setItemWidget(item, widget)
+
     def dropEvent(self, QDropEvent):
         self.target_item = self.itemAt(QDropEvent.pos())
         if self.target_item is None:
@@ -247,12 +248,17 @@ class DragListWidget(QListWidget):
             target_size = self.target_item.sizeHint()
             target_index = self.row(self.target_item)
             target_widget = self.itemWidget(self.target_item)
+            target_label = target_widget.preview_label
+
+            drag_size = self.drag_item.sizeHint()
             drag_index = self.row(self.drag_item)
             drag_widget = self.itemWidget(self.drag_item)
             drag_label = drag_widget.preview_label
-            drag_size = self.drag_item.sizeHint()
+
             if drag_index != target_index:
                 if drag_widget:
+                    drag_label.page_state.fake_page_index, target_label.page_state.fake_page_index = target_label.page_state.fake_page_index, drag_label.page_state.fake_page_index
+                    
                     self._renderItemWidget(target_index + 1, drag_size,
                                            drag_widget)
                     self._renderItemWidget(drag_index + 1, target_size,
@@ -274,12 +280,12 @@ class DragListWidget(QListWidget):
                         drag_index]
             QDropEvent.accept()
 
-    def addWidgetItem(self, itemsize, widget):
+    def addItemWidget(self, itemsize, widget):
         item = QListWidgetItem()
         item.setSizeHint(itemsize)
         self.addItem(item)
         self.setItemWidget(item, widget)
-    
+
     def getItemWidget(self, index):
         item = self.item(index)
         return self.itemWidget(item)
@@ -295,7 +301,16 @@ class DragListWidget(QListWidget):
         self.removeItemWidget(item)
         self.takeItem(index)
 
-    def sortWidgetItems(self): ###待完善
+    def updateItemPreview(self, index, itemsize, pixmap) -> 'PreviewWidget':
+        shadow_width = self.getItemWidget(index).shadow[0]
+        widget = PreviewWidget(index, pixmap, shadow_width)
+        widget.preview_label.setFixedSize(pixmap.size())
+        widget.setFixedHeight(itemsize.height())
+        self.insertItemWidget(index + 1, itemsize, widget)
+        self.takeItemWidget(index)
+        return widget
+
+    def sortWidgetItems(self):  ###待完善
         # widgets = [0] * len(self.indexes)
         for count, index in enumerate(self.indexes):
             item = self.item(count)
@@ -514,7 +529,7 @@ class ImgLabel(QLabel):
 
     def drawPolicy(self, painter):
         # painter.drawPixmap(self.rect(), self.pixmap())
-        painter.drawPixmap(0, 0, self.__edit_pixmap)
+        painter.drawPixmap(0, 0, self.pixmap())
         if self.points.data:
             painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
             for index, point in enumerate(self.points.data, 1):
@@ -537,6 +552,9 @@ class ImgLabel(QLabel):
 
 
 class DisplayLabel(ImgLabel):
+
+    select_rotate_sig = pyqtSignal(bool, int)
+
     def __init__(self, *args, **kwargs):
         parent_widget = kwargs.pop('parent_widget', None)
         super().__init__(*args, **kwargs)
@@ -544,6 +562,11 @@ class DisplayLabel(ImgLabel):
         self._rotate_count = 0
         self._rotate_angle = 0
         self.is_editing = False
+        self.is_select = None
+        self.select_rotate_sig.connect(self._update_select_state)
+    
+    def _update_select_state(self, flag, angle):
+        self.is_select = flag
 
     def mouseMoveEvent(self, QMouseEvent):
         if self.edited:  #???
@@ -563,11 +586,12 @@ class DisplayLabel(ImgLabel):
 
     def rotate(self, angle=90):
         self._rotate_angle += angle
-        transform  = QTransform()
+        transform = QTransform()
         transform.rotate(angle)
         pix = self.pixmap().transformed(transform, Qt.SmoothTransformation)
         self.setPixmap(pix)
-    
+        self.rotate_sig.emit(self._rotate_angle)
+
     def drawPolicy(self, painter):
         painter.drawPixmap(0, 0, self.pixmap())
         if self.points.data:
@@ -697,7 +721,6 @@ class DisplayLabel(ImgLabel):
             pdfwidget.ocr_handle.ocr_signal.emit(activeuser)
         elif action == a4:
             pdfwidget.textBrowser.copy_latest.emit()
-        
 
     def contextMenu(self, pos):
         render_type = self.getPdfWidget().pdf_handle.getEngine().render_type
@@ -709,18 +732,38 @@ class DisplayLabel(ImgLabel):
             self.pdfPolicy()
 
 
-class PreviewLabel(ImgLabel):
+from dataclasses import dataclass
 
-    clicked = pyqtSignal(int)
+@dataclass
+class PageState(object):
+    page_index: int = -1
+    fake_page_index: int = -1
+    rotate: int = 0
+    select_state: bool = False
+    rect_coords: List[List[int]] = [[]]
+
+
+class PreviewLabel(ImgLabel):
     reset_signal = pyqtSignal()
+    clicked = pyqtSignal(int)
+    select_rotate_sig = pyqtSignal(bool, int)
 
     def __init__(self, *args, **kwargs):
         index = kwargs.pop('index', 0)
         super().__init__(*args, **kwargs)
         self.index = index
-        self.dyindex = index
+        self.fake_index = index
         self.edited = False
+        self.page_state = PageState(page_index=index,
+                                    fake_page_index=index,
+                                    select_state=True)
         self.setCursor(Qt.PointingHandCursor)
+
+        self.select_rotate_sig.connect(self._update_page_state)
+    
+    def _update_page_state(self, flag, angle):
+        self.page_state.select_state = flag
+        self.page_state.rotate = angle
 
     def contextMenu(self, pos):
         menu = QMenu(self)
@@ -750,18 +793,20 @@ class PreviewLabel(ImgLabel):
 
 class PreviewWidget(QWidget):
 
+    SHADOW = 20
+
     __slots__ = '__enter', 'selected', 'shadow', 'preview_label', 'layout'
 
-    def __init__(self, index, pixmap, shadow=20):
+    def __init__(self, index, pixmap, shadow=None):
         super().__init__()
         self.__enter = False
         self.selected = True
-        self.shadow = shadow, shadow, shadow, shadow
+        self.shadow = (shadow, ) * 4 if shadow else (self.SHADOW, ) * 4
         self.preview_label = PreviewLabel(index=index, edit_pixmap=pixmap)
         self.preview_label.setScaledContents(True)
         self.preview_label.setPixmap(pixmap)
         self.layout = QHBoxLayout()
-        self.layout.setContentsMargins(shadow, shadow, shadow, shadow)
+        self.layout.setContentsMargins(*self.shadow)
         self.layout.addWidget(self.preview_label)
         self.setLayout(self.layout)
 
@@ -791,6 +836,23 @@ class PreviewWidget(QWidget):
         super().leaveEvent(event)
         self.__enter = False
         self.update()
+
+
+class PreViewListWidget(DragListWidget):
+    def updateItemPreview(self, index, itemsize, pixmap) -> PreviewWidget:
+        shadow_width = self.getItemWidget(index).shadow[0]
+        widget = PreviewWidget(index, pixmap, shadow_width)
+        widget.preview_label.setFixedSize(pixmap.size())
+        widget.setFixedHeight(itemsize.height())
+        self.insertItemWidget(index + 1, itemsize, widget)
+        self.takeItemWidget(index)
+        return widget
+        # widget.preview_label.clicked.connect(self.displayPdfPage)
+        # widget.preview_label.reset_signal.connect(self.resetListWidget)
+
+    def getPreviewLabel(self, index):
+        widget = self.getItemWidget(index)
+        return widget.preview_label
 
 
 class SideButton(QPushButton):
