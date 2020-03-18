@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 import inspect
 
@@ -17,7 +18,7 @@ RectCoords = List[RectCoord]  # [[x1,y1,x2,y2], [x2,y3,x4,y4], ...]
 Region = 'x1,y1,x2,y2;...'
 
 __all__ = [
-    'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size',
+    'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size', 'Rotates',
     'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'Single', 'QSingle', 'NoReturn'
 ]
 
@@ -85,6 +86,23 @@ def slot(signal='', sender='', desc=''):
         return inner
 
     return outer
+
+class RotateError(Exception): ...
+
+class Rotates(Enum):
+    ZERO_CLOCK = 0
+    TRE_CLOCK = 1
+    SIX_CLOCK = 2
+    NIE_CLOCK = 3
+
+    @classmethod
+    def convert(cls, angle: int):
+        if angle % 90 > 0:
+            raise RotateError('Must be an integer multiple of 90')
+        if (angle / 90 % 4 == 0) or (angle / 90 % 4 == 2):
+            return cls.ZERO_CLOCK
+        elif (angle / 90 % 4 == 1) or (angle / 90 % 4 == 3):
+            return cls.TRE_CLOCK
 
 
 class Config(object):
@@ -195,6 +213,7 @@ class MetaThreadSafe(type):
                 self._lock.unlock()
         return inner
 
+
 class QSingle(QObject):
 
     _lock = QMutex()
@@ -219,10 +238,11 @@ class QSingle(QObject):
 
         return inner
 
+
 class Account(Single, metaclass=MetaThreadSafe):
-    
+
     _lock = QMutex(QMutex.Recursive)
-    
+
     def __init__(self):
         super().__init__()
         self.file_path = abspath(join(expanduser('~'), 'ocr_user.json'))
@@ -337,10 +357,8 @@ class User(Single, metaclass=MetaThreadSafe):
                     self.__legal = True
             return self.__legal
 
-
     def set_config(self, config: Config):
         self.config = config
-
 
     def sync(self, account: Account):
         self.config.pop('temporal')
@@ -362,6 +380,7 @@ class User(Single, metaclass=MetaThreadSafe):
     def __repr__(self):
         return f'User<alias:{self.alias}, ...>'
 
+
 def mainTest():
 
     a = Account()
@@ -378,7 +397,6 @@ def mainTest():
     print('-'*20)
     print(Account().active_user().config.info)
 
-    
 
 if __name__ == "__main__":
     mainTest()

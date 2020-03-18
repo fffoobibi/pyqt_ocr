@@ -1,3 +1,4 @@
+from dataclasses import dataclass, field
 import datetime
 import gc
 from os import listdir
@@ -19,8 +20,12 @@ from supports import *
 from customwidgets import Validpoints
 from ruia_ocr import BaiduOcrService, BAIDU_ACCURATE_TYPE, BAIDU_HANDWRITING_TYPE, BAIDU_GENERAL_TYPE
 
-info_time = lambda: datetime.now().strftime('%H:%M:%S')
-save_name = lambda: datetime.now().strftime('%Y%m%d_%H_%M_%S')
+
+def info_time(): return datetime.now().strftime('%H:%M:%S')
+
+
+def save_name(): return datetime.now().strftime('%Y%m%d_%H_%M_%S')
+
 
 __all__ = ['PdfHandle', 'OcrHandle', 'ResultHandle']
 
@@ -114,13 +119,15 @@ class Engine(object):
     def __repr__(self):
         return f'Engine<{self.target}>'
 
+
 @dataclass
 class PageState(object):
     page_index: int = -1
     fake_page_index: int = -1
     rotate: int = 0
     select_state: bool = False
-    rect_coords: List[List[int]] = [[]]
+    rect_coords: List[List[int]] = field(default_factory=list)
+
 
 class PdfHandle(QObject):
 
@@ -139,7 +146,8 @@ class PdfHandle(QObject):
         true_width = self.screenSize[0] / self.PRE_SCREEN_SHRINK
         scaled = true_width / p_width
         p_height = p_height * scaled
-        scaled_pix = pixmap.scaled(true_width, p_height, transformMode=Qt.SmoothTransformation)
+        scaled_pix = pixmap.scaled(
+            true_width, p_height, transformMode=Qt.SmoothTransformation)
         return scaled_pix
 
     def shadowWidth(self):
@@ -166,7 +174,7 @@ class PdfHandle(QObject):
 
         self.page_states: List[PageState] = []
 
-        self.__pdf_preview = None
+        self.__pdf_previewSize = None
         self.__pdf_previewZoom = None
         self.__pdf_displaySize = None
         self.__pdf_displayZoom = None
@@ -228,7 +236,7 @@ class PdfHandle(QObject):
                 self.__screenSize = desktop.width(), desktop.height()
         return self.__screenSize
 
-    def pageSizes(self) -> List[Size]:
+    def pageSizes(self, rotate=Rotates.ZERO_CLOCK) -> List[Size]:
         if self.__pageSizes is None:
             if self.__engine.isPdf:
                 pix = self.__engine.getPixmap(index=0, zoom=(1, 1))
@@ -243,112 +251,164 @@ class PdfHandle(QObject):
                     pix = self.__engine.getPixmap(index=index)
                     page_size.append((pix.width(), pix.height()))
                 self.__pageSizes = page_size
-        return self.__pageSizes
+            self.__previewSizes_h_w = [(h, w) for w, h in self.__pageSizes]
 
-    def previewSize(self, index) -> Size:  # 默认预览图片屏幕分辨率的1/12
+        if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
+            return self.__pageSizes
+        elif (rotate is Rotates.TRE_CLOCK) or (rotate is Rotates.NIE_CLOCK):
+            return self.__previewSizes_h_w
+
+    def previewSize(self, index, rotate=Rotates.ZERO_CLOCK) -> Size:  # 默认预览图片屏幕分辨率的1/12
         if self.__engine.isPdf:
             if self.__pdf_previewSize is None:
-                p_width, p_height = self.pageSizes()[0]
+                p_width, p_height = self.pageSizes(rotate)[0]
                 d_width, d_height = self.screenSize
                 zoom_width = d_width / self.PRE_SCREEN_SHRINK
                 zoom_height = p_height / p_width * zoom_width
                 self.__pdf_previewSize = round(zoom_width,
                                                0), round(zoom_height, 0)
-            return self.__pdf_previewSize
+            # return self.__pdf_previewSize
         else:
             if self.__previewSizes is None:
                 temp = []
-                for size in self.pageSizes():
+                for size in self.pageSizes(rotate):
                     p_width, p_height = size
                     d_width, d_height = self.screenSize
-                    zoom_width = d_width / 12
+                    zoom_width = d_width / self.PRE_SCREEN_SHRINK
                     zoom_height = p_height / p_width * zoom_width
                     temp.append((round(zoom_width, 0), round(zoom_height, 0)))
                 self.__previewSizes = temp
-            return self.__previewSizes[index]
+            # return self.__previewSizes[index]
 
-    def previewZoom(self, index) -> Zoom:
+        if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
+            if self.__engine.isPdf:
+                return self.__pdf_previewSize
+            return self.__previewSizes[index]
+        elif (rotate is Rotates.TRE_CLOCK) or (rotate is Rotates.NIE_CLOCK):
+            if self.__engine.isPdf:
+                p_width, p_height = self.__pdf_previewSize[1], self.__pdf_previewSize[0]
+            else:
+                p_width, p_height = self.__previewSizes[index][1], self.__previewSizes[index][0]
+            d_width, d_height = self.screenSize
+            zoom_width = d_width / self.PRE_SCREEN_SHRINK
+            zoom_height = p_height / p_width * zoom_width
+            return round(zoom_width, 0), round(zoom_height, 0)
+
+    def previewZoom(self, index, rotate=Rotates.ZERO_CLOCK) -> Zoom:
         if self.__engine.isPdf:
             if self.__pdf_previewZoom is None:
-                p_width, p_height = self.pageSizes()[0]
-                width, height = self.previewSize(0)
+                p_width, p_height = self.pageSizes(rotate)[0]
+                width, height = self.previewSize(0, rotate)
                 self.__pdf_previewZoom = width / p_width, width / p_width
-            return self.__pdf_previewZoom
+            # return self.__pdf_previewZoom
         else:
             if self.__previewZooms is None:
                 temp = []
-                for size in self.pageSizes():
+                for size in self.pageSizes(rotate):
                     p_width, p_height = size
-                    width, height = self.previewSize(0)
+                    width, height = self.previewSize(0, rotate)
                     temp.append((width / p_width, width / p_width))
                 self.__previewZooms = temp
+            # return self.__previewZooms[index]
+
+        if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
+            if self.__engine.isPdf:
+                return self.__pdf_previewZoom
             return self.__previewZooms[index]
 
-    def displayZoom(self, index, max_percent=0.80) -> Zoom:
+        elif (rotate is Rotates.TRE_CLOCK) or (rotate is Rotates.NIE_CLOCK):
+            if self.__engine.isPdf:
+                return self.__pdf_previewZoom[1], self.__pdf_previewZoom[0]
+            w_scale, h_sacle = self.__pdf_previewZooms[index]
+            return h_sacle, w_scale
+
+    def displayZoom(self, index, max_percent=0.80, rotate=Rotates.ZERO_CLOCK) -> Zoom:
         def auto_scaled(target):
             p_width, p_height = target
+            print(2222)
             d_width, d_height = self.screenSize
-            if (d_height * max_percent <= p_height) or (d_width * max_percent
-                                                        <= p_width):
+            print(3333)
+            if (d_height * max_percent <= p_height) or (d_width * max_percent <= p_width):
+                print(4444)
                 displayZoom = d_height * max_percent / p_height, d_height * max_percent / p_height
                 return displayZoom
             return 1.0, 1.0
 
         if self.__engine.isPdf:
             if self.__pdf_displayZoom is None:
-                target = self.pageSizes()[0]
+                target = self.pageSizes(rotate)[0]
+                print(target)
                 diszoom = auto_scaled(target)
                 self.__displayZooms = (diszoom
                                        for i in range(self.pageCount()))
                 self.__pdf_displayZoom = diszoom
 
-            return self.__pdf_displayZoom
+            # return self.__pdf_displayZoom
         if self.__displayZooms is None:
             if self.__engine.isFile:
-                target = self.pageSizes()[index]
+                target = self.pageSizes(rotate)[index]
                 self.__displayZooms = [auto_scaled(target)]
             elif self.__engine.isDir:
                 zooms = []
-                for size in self.pageSizes():
+                for size in self.pageSizes(rotate):
                     diszoom = auto_scaled(size)
                     zooms.append(diszoom)
                 self.__displayZooms = zooms
-        return self.__displayZooms[index]
+        # return self.__displayZooms[index]
 
-    def displaySize(self, index) -> Size:
+        if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
+            if self.__engine.isPdf:
+                return self.__pdf_displayZoom
+            return self.__displayZooms[index]
+        elif rotate is Rotates.TRE_CLOCK or rotate is Rotates.NIE_CLOCK:
+            if self.__engine.isPdf:
+                return self.__pdf_displayZoom[1], self.__pdf_displayZoom[0]
+            w_scale, h_scale = self.__displayZooms[index]
+            return h_scale, w_scale
+
+    def displaySize(self, index, rotate=Rotates.ZERO_CLOCK) -> Size:
         if self.__engine.isPdf:
             if self.__pdf_displaySize is None:
-                p_width, p_height = self.pageSizes()[0]
-                dis_zoom = self.displayZoom(0)
+                p_width, p_height = self.pageSizes(rotate)[0]
+                dis_zoom = self.displayZoom(0, rotate=rotate)
                 width = round(p_width * dis_zoom[0], 0)
                 height = round(p_height * dis_zoom[1], 0)
                 self.__pdf_displaySize = width, height
-            return self.__pdf_displaySize
+            # return self.__pdf_displaySize
         if self.__displaySizes is None:
             temp = []
-            for ind, size in enumerate(self.pageSizes()):
+            for ind, size in enumerate(self.pageSizes(rotate)):
                 p_width, p_height = size
-                dis_zoom = self.displayZoom(ind)
+                dis_zoom = self.displayZoom(ind, rotate=rotate)
                 width, height = round(p_width * dis_zoom[0],
                                       0), round(p_height * dis_zoom[1], 0)
                 temp.append((width, height))
-            self.__displaySizes = temp
-        return self.__displaySizes[index]
+            self.__displaySizes=temp
+        # return self.__displaySizes[index]
+
+        if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
+            if self.__engine.isPdf:
+                return self.__pdf_displaySize
+            return self.__displaySizes[index]
+        elif (rotate is Rotates.TRE_CLOCK) or (rotate is Rotates.NIE_CLOCK):
+            if self.__engine.isPdf:
+                return self.__pdf_displaySize[1], self.__pdf_displaySize[0]
+            w, h = self.__displaySizes[index]
+            return h, w
 
     def pageCount(self) -> int:
         return self.__engine.pageCount()
 
-    def renderPixmap(self, index, zoom=(1, 1), rotate=None) -> QPixmap:
-
+    def renderPixmap(self, index, zoom = (1, 1), rotate = None) -> QPixmap:
         return self.__engine.getPixmap(index, zoom, rotate)
 
     def rendering(self) -> NoReturn:
-        self.is_editing = True
-        render_indexes = []
+        self.is_editing=True
+        render_indexes=[]
         for index in range(self.pageCount()):
             render_indexes.append(index)
 
-        length = len(render_indexes)
+        length=len(render_indexes)
 
         self.pageSizes()
         self.displaySize(0)
@@ -356,22 +416,22 @@ class PdfHandle(QObject):
         self.previewSize(0)
         self.previewZoom(0)
 
-        self.pixmaps_indexes = render_indexes
-        self.fake_pixmaps_indexes = render_indexes.copy()
-        self.pixmaps_points = [[[]]] * length
-        self.rotates = [False] * length
-        self.select_state = [True] * length
+        self.pixmaps_indexes=render_indexes
+        self.fake_pixmaps_indexes=render_indexes.copy()
+        self.pixmaps_points=[[[]]] * length
+        self.rotates=[False] * length
+        self.select_state=[True] * length
 
         for index in render_indexes:
-            pagestate = PageState(index, index, 0, True, [[]])
+            pagestate=PageState(index, index, 0, True, [[]])
             self.page_states.append(pagestate)
 
     def open(self, path) -> NoReturn:
         self.engined_counts += 1
         if self.engined_counts == 1:
-            flag = False
+            flag=False
         else:
-            flag = self.__engine.target == path
+            flag=self.__engine.target == path
 
         if flag:
             self.reload_signal.emit()  # 阻塞
@@ -380,7 +440,7 @@ class PdfHandle(QObject):
                 self.setEngine(path)
                 self.rendering()
                 self.display_signal.emit(0, self.pixmaps_indexes)
-                self.reload = QMessageBox.No
+                self.reload=QMessageBox.No
         else:
             self.clear()
             self.setEngine(path)
@@ -388,20 +448,20 @@ class PdfHandle(QObject):
             self.display_signal.emit(0, self.pixmaps_indexes)
 
     def tolocalPdf(self, pages: List[int] = None):
-        base_name = basename(self.getEngine().target)
-        pdf_name, file_types = QFileDialog.getSaveFileName(
+        base_name=basename(self.getEngine().target)
+        pdf_name, file_types=QFileDialog.getSaveFileName(
             None, 'pdf', join(home, base_name), 'PDF(*.pdf)')
         if pdf_name:
             if self.__engine.isPdf:
                 if pages is None:
-                    pgs = []
+                    pgs=[]
                     for state, index in zip(self.select_state,
                                             self.pixmaps_indexes):
                         if state:
                             pgs.append(index)
                 else:
-                    pgs = pages
-                doc = pdf_open(self.__engine.target)
+                    pgs=pages
+                doc=pdf_open(self.__engine.target)
                 doc.select(pgs)
                 doc.save(pdf_name)
                 doc.close()
@@ -411,12 +471,12 @@ class PdfHandle(QObject):
 
 
 class ResultsHandle():
-    def __init__(self, platform='b'):
-        self.platform = platform
+    def __init__(self, platform = 'b'):
+        self.platform=platform
 
     def process(self, results: dict):
         if 'words_result' in results.keys():
-            res = []
+            res=[]
             for dic in results.get('words_result'):
                 res.append(dic.get('words'))
             return res, True
@@ -426,36 +486,34 @@ class ResultsHandle():
 
 class OcrHandle(QObject):
 
-    # _lock = QMutex()
-
-    ocr_signal = pyqtSignal(User)
-    results_signal = pyqtSignal(object)
+    ocr_signal=pyqtSignal(User)
+    results_signal=pyqtSignal(object)
 
     def __init__(self, pdf_handle: PdfHandle = None):
         super().__init__()
-        self.pdf_handle = pdf_handle
-        self.result_handle = ResultsHandle()
-        self.latest_result = ['']
+        self.pdf_handle=pdf_handle
+        self.result_handle=ResultsHandle()
+        self.latest_result=['']
 
-    @slot(signal='ocr_signal', sender='self')
+    @slot(signal = 'ocr_signal', sender = 'self')
     def ocr(self, user: User):
-        platform = user.platform
+        platform=user.platform
         if platform == 'b':
             self.baidu(user)
         else:
             pass
 
     def _parse_to_region(self, points: RectCoords) -> Region:
-        region = ''
+        region=''
         for rect_coord in points:
             region += ','.join(map(str, rect_coord)) + ';'
         return region.strip(';')
 
-    def pixmapToImage(self, pixmap, sacled_size=None):
+    def pixmapToImage(self, pixmap, sacled_size = None):
         if sacled_size is None:
-            qimage = pixmap.toImage()
+            qimage=pixmap.toImage()
         else:
-            qimage = pixmap.scaled(
+            qimage=pixmap.scaled(
                 *sacled_size, transformMode=Qt.SmoothTransformation).toImage()
 
         image = ImageQt.fromqimage(qimage)
@@ -531,3 +589,24 @@ class OcrHandle(QObject):
                             true_page_index)
                         self._ocrByindex(index, user, is_pdf=True)
                         self.thread().msleep(delay)
+
+def test():
+    import sys
+    from PyQt5.QtWidgets import QWidget, QApplication
+    
+    class Widget(QWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.pdf_handle = PdfHandle()
+            self.pdf_handle.setEngine(r'C:\githubs\ocr\test.pdf')
+            self.pdf_handle.pageSizes()
+            self.pdf_handle.previewSize(0)
+            self.pdf_handle.displaySize(0)
+    
+    app = QApplication(sys.argv)
+    win = Widget()
+    win.show()
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    test()
