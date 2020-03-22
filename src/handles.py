@@ -13,7 +13,7 @@ from fitz import open as pdf_open
 from os.path import isfile, exists, isdir, abspath, join, basename
 
 from PyQt5.QtCore import QObject, pyqtSignal, Qt, QThread, QMutex
-from PyQt5.QtWidgets import QMessageBox, QApplication, QFileDialog
+from PyQt5.QtWidgets import QMessageBox, QApplication, QFileDialog, QLabel
 from PyQt5.QtGui import QPixmap, QImage, QTransform
 
 from supports import *
@@ -31,6 +31,9 @@ __all__ = ['PdfHandle', 'OcrHandle', 'ResultHandle']
 
 
 class Engine(object):
+
+    PDF_RENDER_ZOOM = 2
+
     def __init__(self, path):
         if isfile(path) and (path[-3:].lower() == 'pdf'):
             self.render = pdf_open(path)
@@ -87,7 +90,8 @@ class Engine(object):
     def getPixmap(self, index, zoom=(1.0, 1.0), rotate=None) -> QPixmap:
         if self.isPdf:
             x, y = zoom
-            pdf_pixmap = self.render[index].getPixmap(Matrix(2 * x, 2 * y))
+            pdf_pixmap = self.render[index].getPixmap(
+                Matrix(self.PDF_RENDER_ZOOM * x, self.PDF_RENDER_ZOOM * y))
             fmt = QImage.Format_RGBA8888 if pdf_pixmap.alpha else QImage.Format_RGB888
             pixmap = QPixmap.fromImage(
                 QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
@@ -135,9 +139,9 @@ class PdfHandle(QObject):
     PRE_SHADOW_SHRINK = 14  # 阴影占据preview图片宽度的1/14
 
     open_signal = pyqtSignal()
-    display_signal = pyqtSignal(int, list)  # dis_index, showindexes
     reload_signal = pyqtSignal()
     clear_signal = pyqtSignal()
+    display_signal = pyqtSignal(int, list)  # dis_index, showindexes
     ocr_signal = pyqtSignal(list, list)
     save_signal = pyqtSignal(object)
 
@@ -330,7 +334,8 @@ class PdfHandle(QObject):
             print(3333)
             if (d_height * max_percent <= p_height) or (d_width * max_percent <= p_width):
                 print(4444)
-                displayZoom = d_height * max_percent / p_height, d_height * max_percent / p_height
+                displayZoom = d_height * max_percent / \
+                    p_height, d_height * max_percent / p_height
                 return displayZoom
             return 1.0, 1.0
 
@@ -383,7 +388,7 @@ class PdfHandle(QObject):
                 width, height = round(p_width * dis_zoom[0],
                                       0), round(p_height * dis_zoom[1], 0)
                 temp.append((width, height))
-            self.__displaySizes=temp
+            self.__displaySizes = temp
         # return self.__displaySizes[index]
 
         if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
@@ -399,16 +404,16 @@ class PdfHandle(QObject):
     def pageCount(self) -> int:
         return self.__engine.pageCount()
 
-    def renderPixmap(self, index, zoom = (1, 1), rotate = None) -> QPixmap:
+    def renderPixmap(self, index, zoom=(1, 1), rotate=None) -> QPixmap:
         return self.__engine.getPixmap(index, zoom, rotate)
 
     def rendering(self) -> NoReturn:
-        self.is_editing=True
-        render_indexes=[]
+        self.is_editing = True
+        render_indexes = []
         for index in range(self.pageCount()):
             render_indexes.append(index)
 
-        length=len(render_indexes)
+        length = len(render_indexes)
 
         self.pageSizes()
         self.displaySize(0)
@@ -416,22 +421,22 @@ class PdfHandle(QObject):
         self.previewSize(0)
         self.previewZoom(0)
 
-        self.pixmaps_indexes=render_indexes
-        self.fake_pixmaps_indexes=render_indexes.copy()
-        self.pixmaps_points=[[[]]] * length
-        self.rotates=[False] * length
-        self.select_state=[True] * length
+        self.pixmaps_indexes = render_indexes
+        self.fake_pixmaps_indexes = render_indexes.copy()
+        self.pixmaps_points = [[[]]] * length
+        self.rotates = [False] * length
+        self.select_state = [True] * length
 
         for index in render_indexes:
-            pagestate=PageState(index, index, 0, True, [[]])
+            pagestate = PageState(index, index, 0, True, [[]])
             self.page_states.append(pagestate)
 
     def open(self, path) -> NoReturn:
         self.engined_counts += 1
         if self.engined_counts == 1:
-            flag=False
+            flag = False
         else:
-            flag=self.__engine.target == path
+            flag = self.__engine.target == path
 
         if flag:
             self.reload_signal.emit()  # 阻塞
@@ -440,7 +445,7 @@ class PdfHandle(QObject):
                 self.setEngine(path)
                 self.rendering()
                 self.display_signal.emit(0, self.pixmaps_indexes)
-                self.reload=QMessageBox.No
+                self.reload = QMessageBox.No
         else:
             self.clear()
             self.setEngine(path)
@@ -448,20 +453,20 @@ class PdfHandle(QObject):
             self.display_signal.emit(0, self.pixmaps_indexes)
 
     def tolocalPdf(self, pages: List[int] = None):
-        base_name=basename(self.getEngine().target)
-        pdf_name, file_types=QFileDialog.getSaveFileName(
+        base_name = basename(self.getEngine().target)
+        pdf_name, file_types = QFileDialog.getSaveFileName(
             None, 'pdf', join(home, base_name), 'PDF(*.pdf)')
         if pdf_name:
             if self.__engine.isPdf:
                 if pages is None:
-                    pgs=[]
+                    pgs = []
                     for state, index in zip(self.select_state,
                                             self.pixmaps_indexes):
                         if state:
                             pgs.append(index)
                 else:
-                    pgs=pages
-                doc=pdf_open(self.__engine.target)
+                    pgs = pages
+                doc = pdf_open(self.__engine.target)
                 doc.select(pgs)
                 doc.save(pdf_name)
                 doc.close()
@@ -471,12 +476,12 @@ class PdfHandle(QObject):
 
 
 class ResultsHandle():
-    def __init__(self, platform = 'b'):
-        self.platform=platform
+    def __init__(self, platform='b'):
+        self.platform = platform
 
     def process(self, results: dict):
         if 'words_result' in results.keys():
-            res=[]
+            res = []
             for dic in results.get('words_result'):
                 res.append(dic.get('words'))
             return res, True
@@ -486,34 +491,34 @@ class ResultsHandle():
 
 class OcrHandle(QObject):
 
-    ocr_signal=pyqtSignal(User)
-    results_signal=pyqtSignal(object)
+    ocr_signal = pyqtSignal(User)
+    results_signal = pyqtSignal(object)
 
     def __init__(self, pdf_handle: PdfHandle = None):
         super().__init__()
-        self.pdf_handle=pdf_handle
-        self.result_handle=ResultsHandle()
-        self.latest_result=['']
+        self.pdf_handle = pdf_handle
+        self.result_handle = ResultsHandle()
+        self.latest_result = ['']
 
-    @slot(signal = 'ocr_signal', sender = 'self')
+    @slot(signal='ocr_signal', sender='self')
     def ocr(self, user: User):
-        platform=user.platform
+        platform = user.platform
         if platform == 'b':
             self.baidu(user)
         else:
             pass
 
     def _parse_to_region(self, points: RectCoords) -> Region:
-        region=''
+        region = ''
         for rect_coord in points:
             region += ','.join(map(str, rect_coord)) + ';'
         return region.strip(';')
 
-    def pixmapToImage(self, pixmap, sacled_size = None):
+    def pixmapToImage(self, pixmap, sacled_size=None):
         if sacled_size is None:
-            qimage=pixmap.toImage()
+            qimage = pixmap.toImage()
         else:
-            qimage=pixmap.scaled(
+            qimage = pixmap.scaled(
                 *sacled_size, transformMode=Qt.SmoothTransformation).toImage()
 
         image = ImageQt.fromqimage(qimage)
@@ -590,23 +595,32 @@ class OcrHandle(QObject):
                         self._ocrByindex(index, user, is_pdf=True)
                         self.thread().msleep(delay)
 
+
 def test():
     import sys
     from PyQt5.QtWidgets import QWidget, QApplication
-    
+
     class Widget(QWidget):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.pdf_handle = PdfHandle()
-            self.pdf_handle.setEngine(r'C:\githubs\ocr\test.pdf')
-            self.pdf_handle.pageSizes()
-            self.pdf_handle.previewSize(0)
-            self.pdf_handle.displaySize(0)
-    
+            # self.pdf_handle = PdfHandle()
+            # self.pdf_handle.setEngine(r"C:\Users\fqk12\Desktop\test.jpg")
+            # print(self.pdf_handle.pageSizes())
+            # print(self.pdf_handle.getEngine().pagesView())
+            # self.pdf_handle.previewSize(0)
+            # self.pdf_handle.displaySize(0)
+            self.label = QLabel(self)
+            pix = QPixmap(r"C:\\Users\\fqk12\\Desktop\\test.png")
+            print(pix.isNull())
+            print(pix.size())
+            self.label.setPixmap(pix)
+            self.label.setScaledContents(True)
+        
     app = QApplication(sys.argv)
     win = Widget()
     win.show()
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     test()

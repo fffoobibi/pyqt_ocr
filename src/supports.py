@@ -247,7 +247,6 @@ class Account(Single, metaclass=MetaThreadSafe):
         super().__init__()
         self.file_path = abspath(join(expanduser('~'), 'ocr_user.json'))
         self.reload()
-        print(1111, 'init')
 
     def reload(self) -> NoReturn:
         if not exists(self.file_path):

@@ -1,3 +1,1 @@
-from supports import Rotates
-
-print(Rotates.ZERO_CLOCK)
+import cv2 
