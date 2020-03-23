@@ -229,7 +229,8 @@ class AnalysisWidget(QWidget, Ui_Form):
         self.backsig.emit()
 
     def helpSlot(self):
-        print(111)
+        # print(111)
+        pass
 
     def resetSlot(self):
         for edit in self.edits:

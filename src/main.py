@@ -55,36 +55,27 @@ class MainWidget(QMainWindow, Ui_MainWindow):
 
     def init(self):
         self.account = Account()
-        print(1)
         self.dialog = AdvancedDialog(self, account=self.account)
-        print(2)
         self.ocrWidget.account = self.account
-        print(3)
         self.ocrWidget.pushButton_5.clicked.connect(
             lambda: self.stackedWidget.setCurrentIndex(1))
         self.analysisWidget.pushButton_5.clicked.connect(
             lambda: self.stackedWidget.setCurrentIndex(0))
-        print(4)
 
     def setActions(self):
         self.action_advanced.triggered.connect(self.dialogSlot)
         self.dialog.radio_signal.connect(self.updateRadio)
-        print(5)
 
     def setStyles(self):
         self.setWindowIcon(QIcon(':/image/img/app.ico'))
         self.setWindowTitle('文字识别')
-        print(6)
         flag = self.account.active_user().config.get('recognition', 'type', int)
-        print(7, flag)
         if flag == 0:
             self.ocrWidget.radioButton.setChecked(True)
         elif flag == 1:
             self.ocrWidget.radioButton_2.setChecked(True)
-            print('dddd')
         else:
             self.ocrWidget.radioButton_3.setChecked(True)
-        print(8)
         self.ocrWidget.checkBox.setChecked(True)
 
         with open('./sources/flatwhite.css') as file:

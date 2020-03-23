@@ -36,8 +36,7 @@ class Ui_Form(object):
         self.horizontalLayout_6.setObjectName("horizontalLayout_6")
         self.sideButton = SideButton(self.frame_8)
         self.sideButton.setText("")
-        icon1 = QtGui.QIcon()
-        icon1.addPixmap(QtGui.QPixmap(":/image/img/indent-decrease.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon1 = QtGui.QIcon(":/image/img/indent-decrease.svg")
         self.sideButton.setIcon(icon1)
         self.sideButton.setCheckable(True)
         self.sideButton.setObjectName("sideButton")
@@ -119,10 +118,8 @@ class Ui_Form(object):
         self.horizontalLayout_6.addItem(spacerItem)
         self.sideButton_2 = SideButton(self.frame_8)
         self.sideButton_2.setText("")
-        icon2 = QtGui.QIcon()
-        icon2.addPixmap(QtGui.QPixmap(":/image/img/indent-increase.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon2 = QtGui.QIcon(":/image/img/indent-increase.svg")
         self.sideButton_2.setIcon(icon2)
-        self.sideButton_2.setIconSize(QtCore.QSize(18, 18))
         self.sideButton_2.setCheckable(True)
         self.sideButton_2.setObjectName("sideButton_2")
         self.horizontalLayout_6.addWidget(self.sideButton_2)
@@ -135,7 +132,7 @@ class Ui_Form(object):
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.frame_3)
         self.horizontalLayout_2.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-        self.listWidget = DragListWidget(self.frame_3)
+        self.listWidget = PreViewListWidget(self.frame_3)
         self.listWidget.viewport().setProperty("cursor", QtGui.QCursor(QtCore.Qt.PointingHandCursor))
         self.listWidget.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.listWidget.setDragEnabled(True)
@@ -196,9 +193,10 @@ class Ui_Form(object):
         self.horizontalLayout_4.addWidget(self.checkBox)
         self.pushButton_3 = QtWidgets.QPushButton(self.infoFrame)
         self.pushButton_3.setText("")
-        icon3 = QtGui.QIcon()
-        icon3.addPixmap(QtGui.QPixmap(":/image/img/spinner.svg"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
+        icon3 = QtGui.QIcon(":/image/img/spinner.svg")
         self.pushButton_3.setIcon(icon3)
+        self.pushButton_3.setIconSize(QtCore.QSize(25, 25))
+        self.pushButton_3.setStyleSheet('border:none')
         self.pushButton_3.setObjectName("pushButton_3")
         self.horizontalLayout_4.addWidget(self.pushButton_3)
         spacerItem6 = QtWidgets.QSpacerItem(2000, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
@@ -247,5 +245,5 @@ class Ui_Form(object):
 "</style></head><body style=\" font-family:\'SimSun\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
 "<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" text-decoration: underline; color:#0000ff;\">W3School</span></p>\n"
 "<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>"))
-from customwidgets import CTextBrowser, DisplayLabel, DragListWidget, PageLineEdit, PdfLineEdit, SideButton
+from customwidgets import CTextBrowser, DisplayLabel, DragListWidget, PageLineEdit, PdfLineEdit, SideButton, PreViewListWidget
 import srcs
