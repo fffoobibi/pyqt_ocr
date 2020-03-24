@@ -8,6 +8,7 @@ from typing import List, NoReturn, Dict
 from dataclasses import dataclass
 
 from PIL import Image, ImageQt
+from io import BytesIO
 from fitz import Matrix
 from fitz import open as pdf_open
 from os.path import isfile, exists, isdir, abspath, join, basename
@@ -97,7 +98,16 @@ class Engine(object):
                 QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
                        pdf_pixmap.stride, fmt))
         else:
-            pix = QPixmap(self.pagesView()[index])
+            if self.pagesView()[index][-4:].lower() in ['jpeg', '.jpg']:
+                png_data = BytesIO()
+                jpeg_im = Image.open(self.pagesView()[index])
+                jpeg_im.save(png_data, format='PNG')
+                im = Image.open(png_data)
+                pix = QPixmap.fromImage(ImageQt.ImageQt(im))
+                png_data.close()
+                im.close()
+            else:
+                pix = QPixmap(self.pagesView()[index])
             width, height = pix.width(), pix.height()
             pixmap = pix.scaled(width * zoom[0],
                                 height * zoom[1],
@@ -447,10 +457,8 @@ class PdfHandle(QObject):
             if self.__engine.isPdf:
                 if pages is None:
                     pgs = []
-                    for state, index in zip(self.select_state,
-                                            self.pixmaps_indexes):
-                        if state:
-                            pgs.append(index)
+                    for index in self.pixmaps_indexes:
+                        pgs.append(index)
                 else:
                     pgs = pages
                 doc = pdf_open(self.__engine.target)
@@ -589,12 +597,20 @@ class OcrHandle(QObject):
 def test():
     import sys
     from PyQt5.QtWidgets import QWidget, QApplication
+    from io import BytesIO
+    from PIL import Image, ImageQt
+    
 
     class Widget(QWidget):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self.label = QLabel(self)
-            pix = QPixmap(r"C:\\Users\\fqk12\\Desktop\\test.png")
+            png_data = BytesIO()
+            jpeg_im = Image.open(r"C:\\Users\\fqk12\\Desktop\\test.jpg")
+            jpeg_im.save(png_data, format='PNG')
+            im = Image.open(png_data)
+            pix = QPixmap.fromImage(ImageQt.ImageQt(im))
+            
             self.label.setPixmap(pix)
             self.label.setScaledContents(True)
 

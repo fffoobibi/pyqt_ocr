@@ -377,7 +377,6 @@ class PdfWidget(Ui_Form, QWidget):
         if self.ocr_handle.latest_result:
             QApplication.clipboard().setText(self.ocr_handle.latest_result[-1])
 
-
 OcrWidget = PdfWidget
 
 
