@@ -65,6 +65,7 @@ class MainWidget(QMainWindow, Ui_MainWindow):
     def setActions(self):
         self.action_advanced.triggered.connect(self.dialogSlot)
         self.dialog.radio_signal.connect(self.updateRadio)
+        self.statusBar().hide()
 
     def setStyles(self):
         self.setWindowIcon(QIcon(':/image/img/app.ico'))

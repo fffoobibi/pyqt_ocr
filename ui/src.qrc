@@ -1,6 +1,8 @@
 <RCC>
   <qresource prefix="image">
     <file>img/spinner.svg</file>
+    <file>img/arrow-next.svg</file>
+    <file>img/arrow-pre.svg</file>
     <file>img/198-download2.svg</file>
     <file>img/checkbox-checked.svg</file>
     <file>img/checkbox-unchecked.svg</file>

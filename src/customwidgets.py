@@ -7,9 +7,9 @@ from os.path import exists, join, expanduser, isfile, abspath, isdir
 from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
                              QPushButton, QApplication, QTextBrowser, QDialog,
                              QListView, QListWidgetItem, QHBoxLayout, QWidget)
-from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
+from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator, 
                          QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag,
-                         QTransform, QDragEnterEvent)
+                         QTransform, QDragEnterEvent, QDropEvent, QMouseEvent, QDragMoveEvent)
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread, QTime, QSize
 
 from ruia_ocr import (BaiduOcrService, get_file_paths, BAIDU_ACCURATE_TYPE,
@@ -186,19 +186,17 @@ class DragListWidget(QListWidget):
         super().__init__(*args, **kwargs)
         self.setMovement(QListView.Free)
         self.setSpacing(self.MARGINES)
-        # self.indexes = []
         self._start_press = None
 
-    def mousePressEvent(self, QMouseEvent):
-        if QMouseEvent.button() == Qt.LeftButton:
-            self.drag_item = self.itemAt(QMouseEvent.pos())
-            self._start_press = QMouseEvent.pos()
-        super().mousePressEvent(QMouseEvent)
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() == Qt.LeftButton:
+            self.drag_item = self.itemAt(event.pos())
+            self._start_press = event.pos()
+        super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, QMouseEvent):
-        if QMouseEvent.buttons() & Qt.LeftButton:
-            if (QMouseEvent.pos() - self._start_press
-                ).manhattanLength() < QApplication.startDragDistance():
+    def mouseMoveEvent(self, event: QMouseEvent):
+        if event.buttons() & Qt.LeftButton:
+            if (event.pos() - self._start_press).manhattanLength() < QApplication.startDragDistance():
                 return
             if self.drag_item:
                 drag = QDrag(self)
@@ -220,19 +218,19 @@ class DragListWidget(QListWidget):
                 else:
                     pass
 
-    def dragEnterEvent(self, QDragEnterEvent: QDragEnterEvent):
+    def dragEnterEvent(self, event: QDragEnterEvent):
         if self.drag_item:
-            if QDragEnterEvent.source():
-                QDragEnterEvent.setDropAction(Qt.MoveAction)
-                QDragEnterEvent.accept()
+            if event.source():
+                event.setDropAction(Qt.MoveAction)
+                event.accept()
         else:
-            QDragEnterEvent.ignore()
+            event.ignore()
 
-    def dragMoveEvent(self, QDragMoveEvent):
-        QDragMoveEvent.setDropAction(Qt.MoveAction)
-        QDragMoveEvent.accept()
+    def dragMoveEvent(self, event: QDragMoveEvent):
+        event.setDropAction(Qt.MoveAction)
+        event.accept()
 
-    def _renderItemWidget(self, row: int, qsize: QSize, widget):
+    def _renderItemWidget(self, row: int, qsize: QSize, widget: QWidget):
         item = QListWidgetItem()
         item.setSizeHint(qsize)
         if row == -1:
@@ -241,86 +239,26 @@ class DragListWidget(QListWidget):
             self.insertItem(row, item)
         self.setItemWidget(item, widget)
 
-    def dropEvent(self, QDropEvent):
-        self.target_item = self.itemAt(QDropEvent.pos())
-        if self.target_item is None:
-            QDropEvent.setDropAction(Qt.IgnoreAction)
-        else:
-            target_size = self.target_item.sizeHint()
-            target_index = self.row(self.target_item)
-            target_widget = self.itemWidget(self.target_item)
-            target_label = target_widget.preview_label
-
-            drag_size = self.drag_item.sizeHint()
-            drag_index = self.row(self.drag_item)
-            drag_widget = self.itemWidget(self.drag_item)
-            drag_label = drag_widget.preview_label
-
-            if drag_index != target_index:
-                target_label.page_state.fake_page_index, drag_label.page_state.fake_page_index = drag_label.page_state.fake_page_index, target_label.page_state.fake_page_index
-                # print('drag', drag_label.page_state)
-                # print('target', target_label.page_state)
-                if drag_widget:
-                    self._renderItemWidget(target_index + 1, drag_size,
-                                           drag_widget)
-                    self._renderItemWidget(drag_index + 1, target_size,
-                                           target_widget)
-                else:
-                    self.insertItem(target_index + 1, self.drag_item)
-                    self.insertItem(drag_index + 1, self.target_item)
-
-                self.setCurrentRow(target_index)
-                QDropEvent.setDropAction(Qt.MoveAction)
-                drag_label.clicked.emit(drag_label.page_state)
-            else:
-                QDropEvent.setDropAction(Qt.IgnoreAction)
-            QDropEvent.accept()
-
-    def addItemWidget(self, itemsize: QSize, widget):
+    def addItemWidget(self, itemsize: QSize, widget: QWidget) -> NoReturn:
         item = QListWidgetItem()
         item.setSizeHint(itemsize)
         self.addItem(item)
         self.setItemWidget(item, widget)
 
-    def getItemWidget(self, index: int):
+    def getItemWidget(self, index: int) -> QWidget:
         item = self.item(index)
         return self.itemWidget(item)
 
-    def insertItemWidget(self, index: int, itemsize: QSize, widget):
+    def insertItemWidget(self, index: int, itemsize: QSize, widget: QWidget) -> NoReturn:
         item = QListWidgetItem()
         item.setSizeHint(itemsize)
         self.insertItem(index, item)
         self.setItemWidget(item, widget)
 
-    def takeItemWidget(self, index: int):
+    def takeItemWidget(self, index: int) -> NoReturn:
         item = self.item(index)
         self.removeItemWidget(item)
         self.takeItem(index)
-
-    def updateItemPreview(self, index: int, itemsize: QSize, pixmap: QPixmap) -> 'PreviewWidget':
-        item = self.item(index)
-        widget = self.getItemWidget(index)
-        shadow_width = widget.shadow[0]
-        item.setSizeHint(itemsize + QSize(shadow_width * 2, shadow_width * 2))
-        preview_label = widget.preview_label
-        preview_label.setPixmap(pixmap)
-        preview_label.setFixedSize(pixmap.size())
-        preview_label.points.clear()
-        return widget
-
-    def getPreviewLabel(self, index: int) -> 'PreviewLabel':
-        widget = self.getItemWidget(index)
-        return widget.preview_label
-
-    def sortWidgetItems(self):  # 待完善
-        # widgets = [0] * len(self.indexes)
-        for count, index in enumerate(self.indexes):
-            item = self.item(count)
-            widget = self.getItemWidget(index)
-            # widget.preview_label.index = index
-            self.removeItemWidget(item)
-            self.setItemWidget(item, widget)
-        # self.indexes.sort()
 
 
 class DragLineEdit(QLineEdit):
@@ -336,15 +274,15 @@ class DragLineEdit(QLineEdit):
                 return True
         return False
 
-    def dragEnterEvent(self, QDragEnterEvent):
-        if self.filterPolicy(QDragEnterEvent):
-            QDragEnterEvent.accept()
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        if self.filterPolicy(event):
+            event.accept()
         else:
-            QDragEnterEvent.ignore()
+            event.ignore()
 
-    def dropEvent(self, QDropEvent):
+    def dropEvent(self, event: QDropEvent):
         self.setText(
-            QDropEvent.mimeData().text()[8:])  # 如果之前设置ignore 为False 这里将不会生效
+            event.mimeData().text()[8:])  # 如果之前设置ignore 为False 这里将不会生效
 
 
 class PdfLineEdit(DragLineEdit):
@@ -577,7 +515,6 @@ class DisplayLabel(ImgLabel):
         self.setEdit(True)
         self.index = 0
         self.fake_index = 0
-        # print('disfirst:', pixmap.size())
         self.show()
 
     def mouseMoveEvent(self, QMouseEvent):
@@ -590,7 +527,8 @@ class DisplayLabel(ImgLabel):
                     self.points.points_signal.emit(self.points.data)
                     self.is_editing = True
                     self.update()
-                except IndexError:  ...
+                except IndexError:
+                    ...
         else:
             super().mouseMoveEvent(QMouseEvent)
             self.is_editing = False
@@ -598,7 +536,7 @@ class DisplayLabel(ImgLabel):
     def getPdfWidget(self) -> QWidget:
         return self.__pdfwidget
 
-    def rotate(self, angle:int=90) -> NoReturn:
+    def rotate(self, angle: int = 90) -> NoReturn:
         self._rotate_angle += angle
 
         transform = QTransform()
@@ -746,6 +684,7 @@ class DisplayLabel(ImgLabel):
         elif render_type == 'pdf':
             self.pdfPolicy()
 
+
 @dataclass
 class PageState(object):
     page_index: int = -1
@@ -777,13 +716,9 @@ class PreviewLabel(ImgLabel):
         self.select_rotate_index_sig.connect(self._update_page_state)
 
     def _update_page_state(self, flag, angle, index):
-        '''
-        index: 此时的页码
-        '''
         if index == self.page_state.fake_page_index:
             self.page_state.select_state = flag
             self.page_state.rotate = angle
-            # print(index, 'preview更新')
 
     def contextMenu(self, pos):
         menu = QMenu(self)
@@ -859,7 +794,42 @@ class PreviewWidget(QWidget):
 
 class PreViewListWidget(DragListWidget):
 
-    def updateItemPreview(self, index: int, itemsize: QSize, pixmap: QPixmap):
+    def dropEvent(self, event: QDropEvent):
+        self.target_item = self.itemAt(event.pos())
+        if self.target_item is None:
+            event.setDropAction(Qt.IgnoreAction)
+        else:
+            target_size = self.target_item.sizeHint()
+            target_index = self.row(self.target_item)
+            target_widget = self.itemWidget(self.target_item)
+            target_label = target_widget.preview_label
+
+            drag_size = self.drag_item.sizeHint()
+            drag_index = self.row(self.drag_item)
+            drag_widget = self.itemWidget(self.drag_item)
+            drag_label = drag_widget.preview_label
+
+            if drag_index != target_index:
+                # 交换次序
+                target_label.page_state.fake_page_index, drag_label.page_state.fake_page_index = drag_label.page_state.fake_page_index, target_label.page_state.fake_page_index
+
+                if drag_widget:
+                    self._renderItemWidget(target_index + 1, drag_size,
+                                           drag_widget)
+                    self._renderItemWidget(drag_index + 1, target_size,
+                                           target_widget)
+                else:
+                    self.insertItem(target_index + 1, self.drag_item)
+                    self.insertItem(drag_index + 1, self.target_item)
+
+                self.setCurrentRow(target_index)
+                event.setDropAction(Qt.MoveAction)
+                drag_label.clicked.emit(drag_label.page_state)
+            else:
+                event.setDropAction(Qt.IgnoreAction)
+            event.accept()
+
+    def updateItemPreview(self, index: int, itemsize: QSize, pixmap: QPixmap, clear=True) -> NoReturn:
         item = self.item(index)
         widget = self.getItemWidget(index)
         shadow_width = widget.shadow[0]
@@ -867,7 +837,7 @@ class PreViewListWidget(DragListWidget):
         preview_label = widget.preview_label
         preview_label.setPixmap(pixmap)
         preview_label.setFixedSize(pixmap.size())
-        preview_label.points.clear()
+        preview_label.points.clear() if clear else None
 
     def getPreviewLabel(self, index: int) -> PreviewLabel:
         widget = self.getItemWidget(index)
@@ -878,7 +848,6 @@ class PreViewListWidget(DragListWidget):
         for index in range(self.count()):
             pages.append(self.getPreviewLabel(index).page_state)
         return pages
-
 
 
 class SideButton(QPushButton):

@@ -20,7 +20,8 @@ from PyQt5.QtGui import QPixmap, QImage, QTransform
 from supports import *
 from customwidgets import Validpoints
 from ruia_ocr import BaiduOcrService, BAIDU_ACCURATE_TYPE, BAIDU_HANDWRITING_TYPE, BAIDU_GENERAL_TYPE
-
+from requests.exceptions import ConnectionError
+from requests import get
 
 def info_time(): return datetime.now().strftime('%H:%M:%S')
 
@@ -160,7 +161,7 @@ class PdfHandle(QObject):
     ocr_signal = pyqtSignal(list, list)
     save_signal = pyqtSignal(object)
 
-    def scaledPixmaptoPreview(self, pixmap) -> QPixmap:
+    def scaledPixmaptoPreview(self, pixmap: QPixmap) -> QPixmap:
         p_width, p_height = pixmap.width(), pixmap.height()
         true_width = self.screenSize[0] / self.PRE_SCREEN_SHRINK
         scaled = true_width / p_width
@@ -353,7 +354,6 @@ class PdfHandle(QObject):
                                        for i in range(self.pageCount()))
                 self.__pdf_displayZoom = diszoom
 
-            # return self.__pdf_displayZoom
         if self.__displayZooms is None:
             if self.__engine.isFile:
                 target = self.pageSizes(rotate)[index]
@@ -364,7 +364,6 @@ class PdfHandle(QObject):
                     diszoom = auto_scaled(size)
                     zooms.append(diszoom)
                 self.__displayZooms = zooms
-        # return self.__displayZooms[index]
 
         if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
             if self.__engine.isPdf:
@@ -394,7 +393,6 @@ class PdfHandle(QObject):
                                       0), round(p_height * dis_zoom[1], 0)
                 temp.append((width, height))
             self.__displaySizes = temp
-        # return self.__displaySizes[index]
 
         if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
             if self.__engine.isPdf:
@@ -488,6 +486,7 @@ class OcrHandle(QObject):
 
     ocr_signal = pyqtSignal(User)
     results_signal = pyqtSignal(object)
+    error_signal = pyqtSignal()
 
     def __init__(self, pdf_handle: PdfHandle = None, list_widget=None):
         super().__init__()
@@ -558,39 +557,43 @@ class OcrHandle(QObject):
                 self.latest_result[-1] = str(json)
 
     def baidu(self, user: User) -> NoReturn:
-        config: Config = user.config
-        if user.legal:
-            self.workpath = config.get('parseinfo', 'workpath')
-            service = config.get('recognition', 'type')
-            number = config.get('recognition', 'number')
-            delay = int(config.get('recognition', 'delay')) * 1000
-            if service == '0':
-                service_type = BAIDU_GENERAL_TYPE
-            elif service == '1':
-                service_type = BAIDU_ACCURATE_TYPE
-            elif service == '2':
-                service_type = BAIDU_HANDWRITING_TYPE
+        config = user.config
+        try:
+            get('https://www.baidu.com')
+            if user.legal:
+                self.workpath = config.get('parseinfo', 'workpath')
+                service = config.get('recognition', 'type')
+                number = config.get('recognition', 'number')
+                delay = int(config.get('recognition', 'delay')) * 1000
+                if service == '0':
+                    service_type = BAIDU_GENERAL_TYPE
+                elif service == '1':
+                    service_type = BAIDU_ACCURATE_TYPE
+                elif service == '2':
+                    service_type = BAIDU_HANDWRITING_TYPE
 
-            self.ocr_service = BaiduOcrService(user.id,
-                                               user.key,
-                                               user.secret,
-                                               service_type,
-                                               seq='\n')
-            render_type = self.pdf_handle.getEngine().render_type
+                self.ocr_service = BaiduOcrService(user.id,
+                                                user.key,
+                                                user.secret,
+                                                service_type,
+                                                seq='\n')
+                render_type = self.pdf_handle.getEngine().render_type
 
-            if render_type == 'file':
-                page_state = self.list_widget.getPreviewLabel(0).page_state
-                self._ocr_by_pagestate(page_state, user)
-            elif render_type == 'pdf' or render_type == 'dir':
-                if self.workpath== '---此页---:':
-                    page_state = self.list_widget.getPreviewLabel(self.list_widget.currentRow()).page_state
-                    self.workpath = f'page_{page_state.fake_page_index + 1}'
+                if render_type == 'file':
+                    page_state = self.list_widget.getPreviewLabel(0).page_state
                     self._ocr_by_pagestate(page_state, user)
-                else:
-                    for index in range(self.list_widget.count()):
-                        page_state = self.list_widget.getPreviewLabel(index).page_state
-                        self._ocr_by_pagestate(page_state, user, is_pdf=True)
-                        self.thread().msleep(delay)
+                elif render_type == 'pdf' or render_type == 'dir':
+                    if self.workpath== '---此页---:':
+                        page_state = self.list_widget.getPreviewLabel(self.list_widget.currentRow()).page_state
+                        self.workpath = f'page_{page_state.fake_page_index + 1}'
+                        self._ocr_by_pagestate(page_state, user)
+                    else:
+                        for index in range(self.list_widget.count()):
+                            page_state = self.list_widget.getPreviewLabel(index).page_state
+                            self._ocr_by_pagestate(page_state, user, is_pdf=True)
+                            self.thread().msleep(delay)
+        except ConnectionError as e: 
+            self.error_signal.emit()
 
 
 

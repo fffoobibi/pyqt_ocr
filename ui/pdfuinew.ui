@@ -477,6 +477,37 @@
                 </widget>
                </item>
                <item>
+                <widget class="QPushButton" name="pushButton_4">
+                 <property name="styleSheet">
+                  <string notr="true">image: url(:/image/img/arrow-pre.svg);</string>
+                 </property>
+                 <property name="text">
+                  <string/>
+                 </property>
+                 <property name="icon">
+                  <iconset resource="src.qrc">
+                   <normaloff>:/image/img/arrow-pre.svg</normaloff>:/image/img/arrow-pre.svg</iconset>
+                 </property>
+                 <property name="shortcut">
+                  <string>Ctrl+Left</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
+                <widget class="QPushButton" name="pushButton_6">
+                 <property name="text">
+                  <string/>
+                 </property>
+                 <property name="icon">
+                  <iconset resource="src.qrc">
+                   <normaloff>:/image/img/arrow-next.svg</normaloff>:/image/img/arrow-next.svg</iconset>
+                 </property>
+                 <property name="shortcut">
+                  <string>Ctrl+Right</string>
+                 </property>
+                </widget>
+               </item>
+               <item>
                 <spacer name="horizontalSpacer_6">
                  <property name="orientation">
                   <enum>Qt::Horizontal</enum>

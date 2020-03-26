@@ -44,6 +44,7 @@ class PdfWidget(Ui_Form, QWidget):
         self.ocr_handle.destroyed.connect(self.ocr_thread.deleteLater)
         self.ocr_handle.ocr_signal.connect(self.ocr_handle.ocr)
         self.ocr_handle.results_signal.connect(self.display)
+        self.ocr_handle.error_signal.connect(self.errorReplay)
         self.ocr_thread.start()
 
         self.pdf_handle.open_signal.connect(self.render_pdf)
@@ -200,7 +201,11 @@ class PdfWidget(Ui_Form, QWidget):
         replay = QMessageBox.question(self, msg, f'确认重新加载{msg}么?',
                                       QMessageBox.Yes | QMessageBox.No,
                                       QMessageBox.No)
-        self.pdf_handle.reload = replay
+        self.pdf_handle.reload = replay@slot(signal='reload_signal', sender='')
+
+    @slot(signal='error_signal', sender='ocr_handle')
+    def errorReplay(self) -> NoReturn:
+        QMessageBox.warning(self, '警告', '请保持网络通畅')
 
     def _disPointsToPrePoints(self, dis_index,
                               dis_points: RectCoords,
