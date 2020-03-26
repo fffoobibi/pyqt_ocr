@@ -18,8 +18,8 @@ RectCoords = List[RectCoord]  # [[x1,y1,x2,y2], [x2,y3,x4,y4], ...]
 Region = 'x1,y1,x2,y2;...'
 
 __all__ = [
-    'DEFAULT_SETTINGS', 'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size', 'Rotates',
-    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'Single', 'QSingle', 'NoReturn'
+    'DEFAULT_CONFIG', 'Config', 'Account', 'User', 'Size', 'Rotates', 'with_error',
+    'Zoom', 'RectCoord', 'RectCoords', 'Region', 'slot', 'home', 'Single', 'NoReturn'
 ]
 
 home = abspath(expanduser('~\\Desktop')) if exists(
@@ -36,6 +36,17 @@ def slot(signal='', sender='', desc=''):
         return inner
 
     return outer
+
+
+def with_error(func):
+    @wraps(func)
+    def inner(*args, **kwargs):
+        try:
+            res = func(*args, **kwargs)
+            return res
+        except Exception as e:
+            print(e)
+    return inner
 
 
 DEFAULT_CFGS = {
@@ -369,7 +380,6 @@ def mainTest():
     print('-'*20)
     print(Account().active_user().config.info)
 
-    
 
 if __name__ == "__main__":
     import sys
@@ -378,12 +388,11 @@ if __name__ == "__main__":
     from PyQt5.QtCore import *
 
     class Qthread1(QThread):
-        
+
         def __init__(self, *args, **kwargs):
             user = kwargs.pop('user')
             super().__init__(*args, **kwargs)
             self.user = user
-            
 
         def run(self):
             print('b1')
@@ -393,7 +402,6 @@ if __name__ == "__main__":
             u.config.info['parseinfo']['basic'] += 1
             print(Account().active_user().config.info)
             print('b1 done\n')
-
 
     class Qthread2(QThread):
 
@@ -418,7 +426,6 @@ if __name__ == "__main__":
             layout.addWidget(self.b1)
             layout.addWidget(self.b2)
             QMetaObject.connectSlotsByName(self)
-        
 
         @pyqtSlot(bool)
         def on_b1_clicked(self, flag):
@@ -427,9 +434,7 @@ if __name__ == "__main__":
         @pyqtSlot()
         def on_b2_clicked(self):
             self.thread2.start()
-            
-    
-    
+
     app = QApplication(sys.argv)
     win = Widget()
     win.show()

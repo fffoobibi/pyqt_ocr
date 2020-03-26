@@ -141,6 +141,7 @@ class PdfWidget(Ui_Form, QWidget):
         elif flag == 2:
             self.radioButton_3.setChecked(True)
 
+    @with_error
     @slot(signal='returnPressed', sender='lineEdit_2')
     def jump(self, index) -> NoReturn:
         if self.pdf_handle.is_editing:
@@ -268,8 +269,10 @@ class PdfWidget(Ui_Form, QWidget):
             QApplication.processEvents()
         self.listWidget.update()
 
+    @with_error
     @slot(signal='display_signal', sender='pdf_handle')
     def updateListWidget(self, dis_index: int, list_widget_indexes: list):  # 槽函数
+        print('hehe')
         engine = self.pdf_handle.getEngine()
         shadow_width = self.pdf_handle.shadowWidth()
         preview_width, preview_height = self.pdf_handle.previewSize(dis_index)
@@ -277,29 +280,38 @@ class PdfWidget(Ui_Form, QWidget):
         display_zoom = self.pdf_handle.displayZoom(dis_index)
         display_pixmap = self.pdf_handle.renderPixmap(dis_index, display_zoom)
 
+        print('display_pixmap', display_pixmap.size())
+
         self.label_2.setText('of %s' % self.pdf_handle.pageCount())
         self.lineEdit_2.setText(str(dis_index + 1))
         self.listWidget.setFixedWidth(preview_width + shadow_width * 2 + 10 * 2 + 20)
-
         self.displayLabel.initFirst(display_pixmap)
-        self.filelabel.setText(engine.getName(dis_index))
 
+        print(22222)
+        self.filelabel.setText(engine.getName(dis_index))
         self.updatePageCheckState(dis_index)
         self.updateRadioState()
 
+        print(33333)
         # 生成预览图
-
         for index in list_widget_indexes:
             pix = self.pdf_handle.renderPixmap(
                 index, self.pdf_handle.previewZoom(index))
+            print('doneee')
             widget = self.get_item_widget(pix, index)
+            print(2222)
             preview_width, preview_height = self.pdf_handle.previewSize(index)
+            print(3333)
             itemsize = QSize(preview_width + shadow_width * 2,
                              preview_height + shadow_width * 2)
+            print(4444)
             self.listWidget.addItemWidget(itemsize, widget)
+            print(5555)
             QApplication.processEvents()
+            print('eeeee')
 
         self.listWidget.setCurrentRow(dis_index)
+        print('okkk')
 
     @slot(signal='clicked', sender='preview_label')
     def displayPdfPage(self, page_state: PageState):

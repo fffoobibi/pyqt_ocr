@@ -4,7 +4,7 @@ import gc
 from os import listdir
 from functools import wraps
 from datetime import datetime
-from typing import List, NoReturn, Dict
+from typing import List, NoReturn, Dict, Tuple
 from dataclasses import dataclass
 
 from PIL import Image, ImageQt
@@ -22,6 +22,7 @@ from customwidgets import Validpoints, PageState
 from ruia_ocr import BaiduOcrService, BAIDU_ACCURATE_TYPE, BAIDU_HANDWRITING_TYPE, BAIDU_GENERAL_TYPE
 from requests.exceptions import ConnectionError
 from requests import get
+
 
 def info_time(): return datetime.now().strftime('%H:%M:%S')
 
@@ -67,7 +68,7 @@ class Engine(object):
         else:
             return basename(self.pagesView()[index]) if base else self.pagesView()[index]
 
-    def pagesView(self) -> list:
+    def pagesView(self) -> List[str]:
         if self.__pagesView is None:
             if self.isPdf:
                 self.__pagesView = [
@@ -84,7 +85,7 @@ class Engine(object):
                 self.__pagesView = [self.target]
         return self.__pagesView
 
-    def pageCount(self):
+    def pageCount(self) -> int:
         if self.isPdf:
             return self.render.pageCount
         return len(self.pagesView())
@@ -99,40 +100,72 @@ class Engine(object):
                 QImage(pdf_pixmap.samples, pdf_pixmap.width, pdf_pixmap.height,
                        pdf_pixmap.stride, fmt))
         else:
-            if self.pagesView()[index][-4:].lower() in ['jpeg', '.jpg']:
-                png_data = BytesIO()
+            pix = QPixmap(self.pagesView()[index]) 
+            if pix.isNull():
+                # 文件太大时,莫名奇妙的bug
                 jpeg_im = Image.open(self.pagesView()[index])
-                jpeg_im.save(png_data, format='PNG')
-                im = Image.open(png_data)
-                pix = QPixmap.fromImage(ImageQt.ImageQt(im))
-                png_data.close()
-                im.close()
+                width, height = jpeg_im.width, jpeg_im.height
+                s_width = int(round(width * zoom[0], 0))
+                s_height = int(round(height * zoom[1], 0))
+                sm = jpeg_im.resize((s_width, s_height), Image.ANTIALIAS)
+                stream = BytesIO()
+                sm.save(stream, format='PNG')
+                im = Image.open(stream)
+                qimage = ImageQt.ImageQt(im)
+                pixmap = QPixmap.fromImage(qimage)
             else:
-                pix = QPixmap(self.pagesView()[index])
-            width, height = pix.width(), pix.height()
-            pixmap = pix.scaled(width * zoom[0],
-                                height * zoom[1],
-                                transformMode=Qt.SmoothTransformation)
-        if not rotate:
-            return pixmap
-        else:
-            pixmap = pixmap.transformed(self.__transform.rotate(rotate),
-                                        Qt.SmoothTransformation)
+                if zoom != (1.0, 1.0):
+                    width, height = pix.width(), pix.height()
+                    pixmap = pix.scaled(width * zoom[0], height * zoom[1], transformMode=Qt.SmoothTransformation)
+                else:
+                    pixmap = pix
+
+        if rotate:
+            pixmap = pixmap.transformed(self.__transform.rotate(rotate), Qt.SmoothTransformation)
             self.__transform.reset()
             return pixmap
+        return pixmap
+            
 
-    def close(self):
+    def close(self) -> NoReturn:
         if self.isPdf:
             self.render.close()
         self.render = None
         self.__pagesView = None
         gc.collect()
 
+    def pageSizes(self) -> List[Tuple]:
+        if self.isPdf:
+            pix = self.getPixmap(0)
+            width, height = pix.width(), pix.height()
+            return [(width, height) for index in range(self.pageCount())]
+        else:
+            res = []
+            for index in range(self.pageCount()):
+                im = Image.open(self.pagesView()[index])
+                res.append((im.width, im.height))
+                im.close()
+            return res
+
     def __getitem__(self, index) -> QPixmap:
         return self.getPixmap(index)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f'Engine<{self.target}>'
+
+
+class ResultsHandle(object):
+    def __init__(self, platform='b'):
+        self.platform = platform
+
+    def process(self, results: dict):
+        if 'words_result' in results.keys():
+            res = []
+            for dic in results.get('words_result'):
+                res.append(dic.get('words'))
+            return res, True
+        else:
+            return results, False
 
 
 class PdfHandle(QObject):
@@ -174,8 +207,6 @@ class PdfHandle(QObject):
         self.available_screen = True
 
         self.pixmaps_indexes = []
-
-        # self.page_states: List[PageState] = []
 
         self.__pdf_previewSize = None
         self.__pdf_previewZoom = None
@@ -241,14 +272,9 @@ class PdfHandle(QObject):
                 self.__pageSizes = [(pix.width(), pix.height())
                                     for i in range(self.pageCount())]
             elif self.__engine.isFile:
-                pix = self.__engine.getPixmap(index=0)
-                self.__pageSizes = [(pix.width(), pix.height())]
+                self.__pageSizes = [self.__engine.pageSizes()[0]]
             else:
-                page_size = []
-                for index in range(self.pageCount()):
-                    pix = self.__engine.getPixmap(index=index)
-                    page_size.append((pix.width(), pix.height()))
-                self.__pageSizes = page_size
+                self.__pageSizes = self.__engine.pageSizes()
             self.__previewSizes_h_w = [(h, w) for w, h in self.__pageSizes]
 
         if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
@@ -388,7 +414,7 @@ class PdfHandle(QObject):
     def pageCount(self) -> int:
         return self.__engine.pageCount()
 
-    def renderPixmap(self, index, zoom=(1, 1), rotate=None) -> QPixmap:
+    def renderPixmap(self, index, zoom=(1.0, 1.0), rotate=None) -> QPixmap:
         return self.__engine.getPixmap(index, zoom, rotate)
 
     def rendering(self) -> NoReturn:
@@ -449,20 +475,6 @@ class PdfHandle(QObject):
         return f'PdfHandle<{self.__engine}>'
 
 
-class ResultsHandle():
-    def __init__(self, platform='b'):
-        self.platform = platform
-
-    def process(self, results: dict):
-        if 'words_result' in results.keys():
-            res = []
-            for dic in results.get('words_result'):
-                res.append(dic.get('words'))
-            return res, True
-        else:
-            return results, False
-
-
 class OcrHandle(QObject):
 
     ocr_signal = pyqtSignal(User)
@@ -504,11 +516,13 @@ class OcrHandle(QObject):
         index = page_state.page_index
         if page_state.select_state:
             points = page_state.dis_coords
-            region = self._parse_to_region(Validpoints.adjustCoords(points)) if points else None
+            region = self._parse_to_region(
+                Validpoints.adjustCoords(points)) if points else None
             pix = self.pdf_handle.renderPixmap(index, rotate=page_state.rotate)
-            displaysize = self.pdf_handle.displaySize(index, Rotates.convert(page_state.rotate))
+            displaysize = self.pdf_handle.displaySize(
+                index, Rotates.convert(page_state.rotate))
             img = self.pixmap_to_image(pix, displaysize)
-        
+
             if not is_pdf:
                 msg = basename(self.workpath)
             else:
@@ -554,35 +568,58 @@ class OcrHandle(QObject):
                     service_type = BAIDU_HANDWRITING_TYPE
 
                 self.ocr_service = BaiduOcrService(user.id,
-                                                user.key,
-                                                user.secret,
-                                                service_type,
-                                                seq='\n')
+                                                   user.key,
+                                                   user.secret,
+                                                   service_type,
+                                                   seq='\n')
                 render_type = self.pdf_handle.getEngine().render_type
 
                 if render_type == 'file':
                     page_state = self.list_widget.getPreviewLabel(0).page_state
                     self._ocr_by_pagestate(page_state, user)
                 elif render_type == 'pdf' or render_type == 'dir':
-                    if self.workpath== '---此页---:':
-                        page_state = self.list_widget.getPreviewLabel(self.list_widget.currentRow()).page_state
+                    if self.workpath == '---此页---:':
+                        page_state = self.list_widget.getPreviewLabel(
+                            self.list_widget.currentRow()).page_state
                         self.workpath = f'page_{page_state.fake_page_index + 1}'
                         self._ocr_by_pagestate(page_state, user)
                     else:
                         for index in range(self.list_widget.count()):
-                            page_state = self.list_widget.getPreviewLabel(index).page_state
-                            self._ocr_by_pagestate(page_state, user, is_pdf=True)
+                            page_state = self.list_widget.getPreviewLabel(
+                                index).page_state
+                            self._ocr_by_pagestate(
+                                page_state, user, is_pdf=True)
                             self.thread().msleep(delay)
-        except ConnectionError as e: 
+        except ConnectionError as e:
             self.error_signal.emit()
 
 
-
-def test():
-    accout = Account()
-    accout2 = Account()
-    print(id(accout), id(accout2))
-
-
 if __name__ == "__main__":
-    test()
+    import sys
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtGui import *
+    from PyQt5.QtCore import *
+    
+    class Widget(QWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+
+            layout = QHBoxLayout(self)
+
+            self.widget = QWidget()
+            self.label = QLabel(self.widget)
+            self.label.setPixmap(QPixmap(r"C:\Users\fqk12\Desktop\test.jpg"))
+            self.label.move(10,10)
+            self.scrollarea = QScrollArea()
+            self.scrollarea.setWidget(self.widget)
+            layout.addWidget(self.scrollarea)
+
+            self.resize(600, 600)
+            
+    
+    app = QApplication(sys.argv)
+    win = Widget()
+    win.show()
+    sys.exit(app.exec_())
+
+
