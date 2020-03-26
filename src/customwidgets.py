@@ -695,8 +695,7 @@ class PageState(object):
     dis_coords: list = field(default_factory=list)
 
     def __repr__(self):
-        return f'PageState<{self.page_index},{self.fake_page_index},{self.rotate},{self.select_state}...>'
-
+        return f'PageState<{self.page_index},{self.fake_page_index},{self.rotate},{self.select_state},{self.rect_coords}>'
 
 class PreviewLabel(ImgLabel):
 

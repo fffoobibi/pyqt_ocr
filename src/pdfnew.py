@@ -201,7 +201,7 @@ class PdfWidget(Ui_Form, QWidget):
         replay = QMessageBox.question(self, msg, f'确认重新加载{msg}么?',
                                       QMessageBox.Yes | QMessageBox.No,
                                       QMessageBox.No)
-        self.pdf_handle.reload = replay@slot(signal='reload_signal', sender='')
+        self.pdf_handle.reload = replay
 
     @slot(signal='error_signal', sender='ocr_handle')
     def errorReplay(self) -> NoReturn:

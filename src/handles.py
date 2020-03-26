@@ -18,7 +18,7 @@ from PyQt5.QtWidgets import QMessageBox, QApplication, QFileDialog, QLabel
 from PyQt5.QtGui import QPixmap, QImage, QTransform
 
 from supports import *
-from customwidgets import Validpoints
+from customwidgets import Validpoints, PageState
 from ruia_ocr import BaiduOcrService, BAIDU_ACCURATE_TYPE, BAIDU_HANDWRITING_TYPE, BAIDU_GENERAL_TYPE
 from requests.exceptions import ConnectionError
 from requests import get
@@ -135,20 +135,6 @@ class Engine(object):
         return f'Engine<{self.target}>'
 
 
-@dataclass
-class PageState(object):
-    page_index: int = -1
-    fake_page_index: int = -1
-    rotate: int = 0
-    select_state: bool = False
-    rect_coords: list = field(default_factory=list)
-    dis_coords: list = field(default_factory=list)
-
-    def __repr__(self):
-        return f'PageState<{self.page_index},{self.fake_page_index},{self.rotate},{self.select_state},{self.rect_coords}>'
-
-
-
 class PdfHandle(QObject):
 
     PRE_SCREEN_SHRINK = 12  # 预览图片宽度占据屏幕的1/12
@@ -201,7 +187,6 @@ class PdfHandle(QObject):
         self.__displayZooms: list = None
         self.__displaySizes: list = None
         self.__pageSizes: list = None
-        self.rotates: list = None
 
         self.save_signal.connect(self.tolocalPdf)
 
@@ -211,7 +196,6 @@ class PdfHandle(QObject):
         self.__displayZooms: list = None
         self.__displaySizes: list = None
         self.__pageSizes: list = None
-        self.rotates: list = None
 
         self.__screenSize = None
         self.__shadowWidth = None
@@ -281,7 +265,6 @@ class PdfHandle(QObject):
                 zoom_height = p_height / p_width * zoom_width
                 self.__pdf_previewSize = round(zoom_width,
                                                0), round(zoom_height, 0)
-            # return self.__pdf_previewSize
         else:
             if self.__previewSizes is None:
                 temp = []
@@ -292,7 +275,6 @@ class PdfHandle(QObject):
                     zoom_height = p_height / p_width * zoom_width
                     temp.append((round(zoom_width, 0), round(zoom_height, 0)))
                 self.__previewSizes = temp
-            # return self.__previewSizes[index]
 
         if (rotate is Rotates.ZERO_CLOCK) or (rotate is Rotates.SIX_CLOCK):
             if self.__engine.isPdf:
@@ -383,7 +365,6 @@ class PdfHandle(QObject):
                 width = round(p_width * dis_zoom[0], 0)
                 height = round(p_height * dis_zoom[1], 0)
                 self.__pdf_displaySize = width, height
-            # return self.__pdf_displaySize
         if self.__displaySizes is None:
             temp = []
             for ind, size in enumerate(self.pageSizes(rotate)):
@@ -598,29 +579,9 @@ class OcrHandle(QObject):
 
 
 def test():
-    import sys
-    from PyQt5.QtWidgets import QWidget, QApplication
-    from io import BytesIO
-    from PIL import Image, ImageQt
-    
-
-    class Widget(QWidget):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.label = QLabel(self)
-            png_data = BytesIO()
-            jpeg_im = Image.open(r"C:\\Users\\fqk12\\Desktop\\test.jpg")
-            jpeg_im.save(png_data, format='PNG')
-            im = Image.open(png_data)
-            pix = QPixmap.fromImage(ImageQt.ImageQt(im))
-            
-            self.label.setPixmap(pix)
-            self.label.setScaledContents(True)
-
-    app = QApplication(sys.argv)
-    win = Widget()
-    win.show()
-    sys.exit(app.exec_())
+    accout = Account()
+    accout2 = Account()
+    print(id(accout), id(accout2))
 
 
 if __name__ == "__main__":

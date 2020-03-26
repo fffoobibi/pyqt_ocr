@@ -25,7 +25,20 @@ __all__ = [
 home = abspath(expanduser('~\\Desktop')) if exists(
     abspath(expanduser('~\\Desktop'))) else abspath(expanduser('~'))
 
-DEFAULT_SETTINGS = {
+
+def slot(signal='', sender='', desc=''):
+    def outer(func):
+        @wraps(func)
+        def inner(*args, **kwargs):
+            res = func(*args, **kwargs)
+            return res
+
+        return inner
+
+    return outer
+
+
+DEFAULT_CFGS = {
     'recognition': {
         'delay': 2,
         'number': -1,
@@ -46,14 +59,10 @@ DEFAULT_SETTINGS = {
         'basic': 0,
         'handwriting': 0,
         'accurate': 0,
-    },
-    'temporal': {
-        'ocr_image': [],
-        'rect_coords': []
     }
 }
 
-__personal_config = deepcopy(DEFAULT_SETTINGS)
+__personal_config = deepcopy(DEFAULT_CFGS)
 
 ACCOUNT_SETTINGS = {
     'user1': {
@@ -76,18 +85,9 @@ ACCOUNT_SETTINGS = {
 }
 
 
-def slot(signal='', sender='', desc=''):
-    def outer(func):
-        @wraps(func)
-        def inner(*args, **kwargs):
-            res = func(*args, **kwargs)
-            return res
+class RotateError(Exception):
+    ...
 
-        return inner
-
-    return outer
-
-class RotateError(Exception): ...
 
 class Rotates(Enum):
     ZERO_CLOCK = 0
@@ -118,8 +118,7 @@ class Config(object):
             self.__from_dict = False
             self._file_path = abspath(join(expanduser('~'), 'ocr_app.cfg'))
             if not exists(self._file_path):
-                dft = DEFAULT_SETTINGS.copy()
-                dft.pop('temporal')
+                dft = DEFAULT_CFGS.copy()
                 self.info = dft
                 with open(self._file_path, 'w') as file:
                     cp.write(file)
@@ -148,7 +147,6 @@ class Config(object):
 
     def flush(self) -> bool:
         dic = self.to_dict()
-        dic.pop('temporal', None)
         return self.__save(dic)
 
     def __save(self, dic) -> bool:
@@ -164,7 +162,7 @@ class Config(object):
         return self.to_dict()
 
 
-DEFAULT_CONFIG = Config.fromDict(DEFAULT_SETTINGS)
+DEFAULT_CONFIG = Config.fromDict(DEFAULT_CFGS)
 
 
 class Single(object):
@@ -211,31 +209,6 @@ class MetaThreadSafe(type):
                 return res
             finally:
                 self._lock.unlock()
-        return inner
-
-
-class QSingle(QObject):
-
-    _lock = QMutex()
-
-    def __new__(cls, *args, **kwargs):
-        cls._lock.lock()
-        if not hasattr(cls, '_instance'):
-            cls._instance = QObject.__new__(cls)
-            cls._instance.__inited__ = False
-            cls.__init__ = cls.singleinit(cls.__init__)
-        cls._lock.unlock()
-        return cls._instance
-
-    @classmethod
-    def singleinit(cls, func):
-        def inner(*args, **kwargs):
-            cls._lock.lock()
-            if getattr(cls._instance, '__inited__') == False:
-                func(*args, **kwargs)
-                cls._instance.__inited__ = True
-            cls._lock.unlock()
-
         return inner
 
 
@@ -312,18 +285,20 @@ class User(Single, metaclass=MetaThreadSafe):
         secret = dic['secret']
         platform = dic['platform']
         alias = dic['alias']
-        cls._lock.lock()
-        for user in cls.__users__:
-            if all([
-                    id == user.id, key == user.key, secret == user.key,
-                    platform == user.platform, alias == user.alias
-            ]):
-                return user
-        else:
-            legal = dic['legal']
-            config = Config.fromDict(dic['config'])
-        cls._lock.unlock()
-        return User(id, key, secret, alias, platform, legal, config)
+        try:
+            cls._lock.lock()
+            for user in cls.__users__:
+                if all([
+                        id == user.id, key == user.key, secret == user.key,
+                        platform == user.platform, alias == user.alias
+                ]):
+                    return user
+            else:
+                legal = dic['legal']
+                config = Config.fromDict(dic['config'])
+            return User(id, key, secret, alias, platform, legal, config)
+        finally:
+            cls._lock.unlock()
 
     def __init__(self,
                  id,
@@ -360,12 +335,10 @@ class User(Single, metaclass=MetaThreadSafe):
         self.config = config
 
     def sync(self, account: Account):
-        self.config.pop('temporal')
         account.add_user(self)
 
     def to_dict(self) -> Dict:
         config = self.config.to_dict()
-        config.pop('temporal', None)
         return {
             'id': self.id,
             'key': self.key,
@@ -392,10 +365,72 @@ def mainTest():
     u.config.info['parseinfo']['basic'] += 1
     u.config.info['parseinfo']['basic'] += 1
     print(u.config.info)
-    # u.sync(Account())
+    u.sync(Account())
     print('-'*20)
     print(Account().active_user().config.info)
 
+    
 
 if __name__ == "__main__":
-    mainTest()
+    import sys
+    from PyQt5.QtWidgets import *
+    from PyQt5.QtGui import *
+    from PyQt5.QtCore import *
+
+    class Qthread1(QThread):
+        
+        def __init__(self, *args, **kwargs):
+            user = kwargs.pop('user')
+            super().__init__(*args, **kwargs)
+            self.user = user
+            
+
+        def run(self):
+            print('b1')
+            account = Account()
+            # u = account.active_user()
+            u = self.user
+            u.config.info['parseinfo']['basic'] += 1
+            print(Account().active_user().config.info)
+            print('b1 done\n')
+
+
+    class Qthread2(QThread):
+
+        def run(self):
+            print('b2')
+
+            print(Account().active_user().config.info)
+            print('b2 done\n')
+
+    class Widget(QWidget):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            layout = QHBoxLayout(self)
+            self.account = Account()
+            self.user = self.account.active_user()
+            self.b1 = QPushButton('b1', self)
+            self.b2 = QPushButton('b2', self)
+            self.b1.setObjectName('b1')
+            self.b2.setObjectName('b2')
+            self.thread1 = Qthread1(user=self.user)
+            self.thread2 = Qthread2()
+            layout.addWidget(self.b1)
+            layout.addWidget(self.b2)
+            QMetaObject.connectSlotsByName(self)
+        
+
+        @pyqtSlot(bool)
+        def on_b1_clicked(self, flag):
+            self.thread1.start()
+
+        @pyqtSlot()
+        def on_b2_clicked(self):
+            self.thread2.start()
+            
+    
+    
+    app = QApplication(sys.argv)
+    win = Widget()
+    win.show()
+    sys.exit(app.exec_())
