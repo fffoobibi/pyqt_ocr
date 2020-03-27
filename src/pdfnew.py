@@ -13,6 +13,7 @@ from srcs import *
 
 PdfHandle.PRE_SCREEN_SHRINK = 15
 
+
 class PdfWidget(Ui_Form, QWidget):
 
     def __init__(self, *args, **kwargs):
@@ -36,8 +37,8 @@ class PdfWidget(Ui_Form, QWidget):
         self.pdf_thread.finished.connect(self.pdf_handle.deleteLater)
         self.pdf_handle.destroyed.connect(self.pdf_thread.deleteLater)
 
-        self.ocr_handle = OcrHandle(
-            self.pdf_handle, self.listWidget)  # self.pdf_handle
+        self.ocr_handle = OcrHandle(pdf_handle=self.pdf_handle,
+                                    list_widget=self.listWidget)  # self.pdf_handle
         self.ocr_thread = QThread()
         self.ocr_handle.moveToThread(self.ocr_thread)
         self.ocr_thread.finished.connect(self.ocr_handle.deleteLater)
@@ -194,7 +195,8 @@ class PdfWidget(Ui_Form, QWidget):
     def clear_infos(self) -> NoReturn:
         self.listWidget.clear()
         self.displayLabel.points.clear()
-        import gc;gc.collect()
+        import gc
+        gc.collect()
 
     @slot(signal='reload_signal', sender='')
     def reload(self) -> NoReturn:
@@ -272,7 +274,6 @@ class PdfWidget(Ui_Form, QWidget):
     @with_error
     @slot(signal='display_signal', sender='pdf_handle')
     def updateListWidget(self, dis_index: int, list_widget_indexes: list):  # 槽函数
-        print('hehe')
         engine = self.pdf_handle.getEngine()
         shadow_width = self.pdf_handle.shadowWidth()
         preview_width, preview_height = self.pdf_handle.previewSize(dis_index)
@@ -280,11 +281,10 @@ class PdfWidget(Ui_Form, QWidget):
         display_zoom = self.pdf_handle.displayZoom(dis_index)
         display_pixmap = self.pdf_handle.renderPixmap(dis_index, display_zoom)
 
-        print('display_pixmap', display_pixmap.size())
-
         self.label_2.setText('of %s' % self.pdf_handle.pageCount())
         self.lineEdit_2.setText(str(dis_index + 1))
-        self.listWidget.setFixedWidth(preview_width + shadow_width * 2 + 10 * 2 + 20)
+        self.listWidget.setFixedWidth(
+            preview_width + shadow_width * 2 + 10 * 2 + 20)
         self.displayLabel.initFirst(display_pixmap)
 
         print(22222)
@@ -297,21 +297,18 @@ class PdfWidget(Ui_Form, QWidget):
         for index in list_widget_indexes:
             pix = self.pdf_handle.renderPixmap(
                 index, self.pdf_handle.previewZoom(index))
-            print('doneee')
+
             widget = self.get_item_widget(pix, index)
-            print(2222)
+
             preview_width, preview_height = self.pdf_handle.previewSize(index)
-            print(3333)
+
             itemsize = QSize(preview_width + shadow_width * 2,
                              preview_height + shadow_width * 2)
-            print(4444)
+
             self.listWidget.addItemWidget(itemsize, widget)
-            print(5555)
             QApplication.processEvents()
-            print('eeeee')
 
         self.listWidget.setCurrentRow(dis_index)
-        print('okkk')
 
     @slot(signal='clicked', sender='preview_label')
     def displayPdfPage(self, page_state: PageState):
@@ -319,7 +316,8 @@ class PdfWidget(Ui_Form, QWidget):
         index = page_state.page_index  # 渲染的图片的真正索引
         preview_label = self.listWidget.getPreviewLabel(index)
         self.displayLabel._rotate_angle = page_state.rotate  # 重要,重置状态
-        page = self.pdf_handle.renderPixmap(index, self.pdf_handle.displayZoom(index), page_state.rotate)
+        page = self.pdf_handle.renderPixmap(
+            index, self.pdf_handle.displayZoom(index), page_state.rotate)
         self.displayLabel.clearXYCoords()
         self.lineEdit_2.setText(str(row + 1))
         self.displayLabel.index = index
@@ -393,6 +391,7 @@ class PdfWidget(Ui_Form, QWidget):
     def copy_latest(self):
         if self.ocr_handle.latest_result:
             QApplication.clipboard().setText(self.ocr_handle.latest_result[-1])
+
 
 OcrWidget = PdfWidget
 

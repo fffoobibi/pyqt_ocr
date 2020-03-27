@@ -3,14 +3,15 @@ from typing import List
 from math import sqrt
 from PIL import ImageQt, Image
 from os.path import exists, join, expanduser, isfile, abspath, isdir
+from enum import Enum
 
 from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
                              QPushButton, QApplication, QTextBrowser, QDialog,
                              QListView, QListWidgetItem, QHBoxLayout, QWidget)
-from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator, 
+from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
                          QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag,
                          QTransform, QDragEnterEvent, QDropEvent, QMouseEvent, QDragMoveEvent)
-from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread, QTime, QSize
+from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread, QTime, QSize, QRect
 
 from ruia_ocr import (BaiduOcrService, get_file_paths, BAIDU_ACCURATE_TYPE,
                       BAIDU_GENERAL_TYPE, BAIDU_HANDWRITING_TYPE)
@@ -375,9 +376,17 @@ class Validpoints(QObject):
             return True
         return False
 
-    def appends(self, points: RectCoords):
+    def appends(self, points: RectCoords) -> NoReturn:
         for point in points:
             self.append(point)
+
+    def appendRect(self, qrect: QRect) -> bool:
+        rects = list(qrect.getCoords())
+        return self.append(rects)
+
+    def appendRects(self, qrects: List[QRect]) -> NoReturn:
+        for rect in qrects:
+            self.appendRect(rect)
 
     def clear(self):
         self.__data.clear()
@@ -394,6 +403,11 @@ class Validpoints(QObject):
 
 
 class ImgLabel(QLabel):
+
+    start_point = None
+    PEN = QPen(Qt.darkYellow, 2, Qt.DashLine)
+    FILL_COLOR = QColor(50, 50, 50, 30)
+
     def __init__(self, *args, **kwargs):
         edit_pixmap = kwargs.pop('edit_pixmap', None)
         super().__init__(*args, **kwargs)
@@ -437,6 +451,9 @@ class ImgLabel(QLabel):
             self.points.points_signal.emit(points)
 
     def mousePressEvent(self, QMouseEvent):
+        if QMouseEvent.button() == Qt.LeftButton:
+            self.start_point = QMouseEvent.pos()
+
         if self.__edit_pixmap and self.edited:
             if QMouseEvent.button() == Qt.LeftButton:
                 self.points.append([QMouseEvent.x(), QMouseEvent.y(), 0, 0])
@@ -470,7 +487,7 @@ class ImgLabel(QLabel):
     def drawPolicy(self, painter):
         painter.drawPixmap(0, 0, self.pixmap())
         if self.points.data:
-            painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
+            painter.setPen(self.PEN)
             for index, point in enumerate(self.points.data, 1):
                 x1, y1, x2, y2 = point
                 msg = str(index)
@@ -478,26 +495,46 @@ class ImgLabel(QLabel):
                 if (x2 - x1) > 0 and (y2 - y1) > 0:
                     painter.drawRect(x1, y1, w, h)  # 右下方滑动
                     painter.drawText(x1, y1 - 4, msg)
+                    painter.fillRect(x1, y1, w, h, self.FILL_COLOR)
                 elif (x2 - x1) > 0 and (y2 - y1) < 0:
                     painter.drawRect(x1, y1 - h, w, h)  # 右上方滑动
                     painter.drawText(x1, y2 - 4, msg)
+                    painter.fillRect(x1, y1 - h, w, h, self.FILL_COLOR)
 
                 elif (x2 - x1) < 0 and (y2 - y1) > 0:
                     painter.drawRect(x1 - w, y1, w, h)  # 左下方滑动
                     painter.drawText(x2, y1 - 4, msg)
+                    painter.fillRect(x1 - w, y1, w, h, self.FILL_COLOR)
+
                 else:
                     painter.drawRect(x2, y1 - h, w, h)  # 左上方滑动
                     painter.drawText(x2, y2 - 4, msg)
+                    painter.fillRect(x2, y1 - h, w, h, self.FILL_COLOR)
+
+
+
+class Actions(Enum):
+    MOVE_RECT = 0
+    DRAW_RECT = 1
+    ACTION_NONE = 2
 
 
 class DisplayLabel(ImgLabel):
 
+    USE_MOVE = False
+    action = Actions.ACTION_NONE
     select_rotate_index_sig = pyqtSignal(bool, int, int)
     restore_rotate_sig = pyqtSignal(int)
 
     def __init__(self, *args, **kwargs):
-        parent_widget = kwargs.pop('parent_widget', None)
+        parent_widget = kwargs.pop('parent_widget')
         super().__init__(*args, **kwargs)
+        self.setMouseTracking(True)
+        self.rects = []
+        self.rects_rs = []
+        self.current_move_index = None
+        self.current_move_point = None
+
         self.__pdfwidget = parent_widget
         self._rotate_angle = 0
         self.index = -1
@@ -509,6 +546,21 @@ class DisplayLabel(ImgLabel):
     def _restore_angle(self, rotate):
         self._rotate_angle = rotate
 
+    def clearAll(self):
+        self.clearMovedInfos()
+        self.points.clear()
+        self._rotate_angle = 0
+        self.index = -1
+        self.fake_index = -1
+        self.is_editing = False
+        self.is_select = True
+
+    def clearMovedInfos(self):
+        self.rects = []
+        self.rects_rs = []
+        self.current_move_index = None
+        self.current_move_point = None
+
     def initFirst(self, pixmap: QPixmap) -> NoReturn:
         self.setPixmap(pixmap)
         self.setEditPixmap(True)
@@ -517,11 +569,34 @@ class DisplayLabel(ImgLabel):
         self.fake_index = 0
         self.show()
 
+    def mouseReleaseEvent(self, event):
+        if self.USE_MOVE:
+            if self.action == Actions.MOVE_RECT:
+                if self.current_move_index is not None:
+                    self.rects_rs[self.current_move_index] = self.current_move_point
+        super().mouseReleaseEvent(event)
+
     def mouseMoveEvent(self, QMouseEvent):
+        if self.USE_MOVE:
+            for index, rect in enumerate(self.rects):
+                if rect.contains(QMouseEvent.pos()):
+                    self.setCursor(Qt.SizeAllCursor)
+                    if QMouseEvent.buttons() & Qt.LeftButton:
+                        self.action = Actions.MOVE_RECT
+                        xpoint = QMouseEvent.pos() - self.start_point
+                        rs = self.rects_rs[index]
+                        rect.moveTopLeft(rs + xpoint)
+                        self.current_move_index = index
+                        self.current_move_point = rect.topLeft()
+                        self.update()
+                        return
+                    break
+                else:
+                    self.setCursor(Qt.CrossCursor)
+
         if self.edited:  # ???
-            if (QMouseEvent.buttons()
-                    & Qt.LeftButton) and self.rect().contains(
-                        QMouseEvent.pos()):
+            if (QMouseEvent.buttons() & Qt.LeftButton) and self.rect().contains(QMouseEvent.pos()):
+                self.action = Actions.DRAW_RECT
                 try:
                     self.points[-1][-2:] = [QMouseEvent.x(), QMouseEvent.y()]
                     self.points.points_signal.emit(self.points.data)
@@ -532,6 +607,7 @@ class DisplayLabel(ImgLabel):
         else:
             super().mouseMoveEvent(QMouseEvent)
             self.is_editing = False
+            self.action = Actions.ACTION_NONE
 
     def getPdfWidget(self) -> QWidget:
         return self.__pdfwidget
@@ -555,34 +631,63 @@ class DisplayLabel(ImgLabel):
 
     def drawPolicy(self, painter):
         painter.drawPixmap(0, 0, self.pixmap())
-        if self.points.data:
-            painter.setPen(QPen(Qt.red, 2, Qt.SolidLine))
+        painter.setPen(self.PEN)
+        if self.action == Actions.DRAW_RECT:
+            self.rects = [0] * len(self.points.data)
+            self.rects_rs = [0] * len(self.rects)
             for index, point in enumerate(self.points.data, 1):
                 x1, y1, x2, y2 = point
                 msg = str(index)
                 w, h = abs(x2 - x1), abs(y2 - y1)
                 if (x2 - x1) > 0 and (y2 - y1) > 0:
                     painter.drawRect(x1, y1, w, h)  # 右下方滑动
+                    painter.fillRect(x1, y1, w, h, self.FILL_COLOR)
                     painter.drawText(x1, y1 - 4, msg)
+                    rect = QRect()
+                    rect.setRect(x1, y1, w, h)
+                    self.rects[index - 1] = rect
                 elif (x2 - x1) > 0 and (y2 - y1) < 0:
                     painter.drawRect(x1, y1 - h, w, h)  # 右上方滑动
+                    painter.fillRect(x1, y1 - h, w, h, self.FILL_COLOR)
                     painter.drawText(x1, y2 - 4, msg)
-
+                    rect = QRect()
+                    rect.setRect(x1, y1 - h, w, h)
+                    self.rects[index - 1] = rect
                 elif (x2 - x1) < 0 and (y2 - y1) > 0:
                     painter.drawRect(x1 - w, y1, w, h)  # 左下方滑动
+                    painter.fillRect(x1 - w, y1, w, h, self.FILL_COLOR)
                     painter.drawText(x2, y1 - 4, msg)
+                    rect = QRect()
+                    rect.setRect(x1 - w, y1, w, h)
+                    self.rects[index - 1] = rect
                 else:
                     painter.drawRect(x2, y1 - h, w, h)  # 左上方滑动
+                    painter.fillRect(x2, y1 - h, w, h, self.FILL_COLOR)
                     painter.drawText(x2, y2 - 4, msg)
+                    rect = QRect()
+                    rect.setRect(x2, y1 - h, w, h)
+                    self.rects[index - 1] = rect
+                self.rects_rs[index - 1] = rect.topLeft()
+        elif self.action == Actions.MOVE_RECT:
+            self.setCursor(Qt.SizeAllCursor)
+            for index, rect in enumerate(self.rects, 1):
+                x, y = rect.x(), rect.y()
+                painter.drawRect(rect)
+                painter.fillRect(rect, self.FILL_COLOR)
+                painter.drawText(x, y - 4, str(index))
+            self.points.clear()
+            self.points.appendRects(self.rects)
 
     def filePolicy(self):
         menu = QMenu(self)
-        a1 = menu.addAction('清除区域')
+        a1 = menu.addAction('清楚区域')
+        menu.addSeparator()
         a2 = menu.addAction('识别此页')
         a3 = menu.addAction('复制结果')
         action = menu.exec_(QCursor.pos())
         if action == a1:
-            self.points.clear()
+            self.clearXYCoords()
+            self.clearMovedInfos()
             self.points.points_signal.emit([])
             self.update()
         elif action == a2:
@@ -603,15 +708,18 @@ class DisplayLabel(ImgLabel):
     def pdfPolicy(self):
         menu = QMenu(self)
         a1 = menu.addAction('清除区域')
+        menu.addSeparator()
         a2 = menu.addAction('识别此页')
         a3 = menu.addAction('识别pdf')
         a4 = menu.addAction('导出pdf')
+        menu.addSeparator()
         a5 = menu.addAction('复制结果')
         action = menu.exec_(QCursor.pos())
         pdfwidget = self.getPdfWidget()
         activeuser = Account().active_user()
         if action == a1:
-            self.points.clear()
+            self.clearXYCoords()
+            self.clearMovedInfos()
             self.points.points_signal.emit([])
             self.update()
         elif action == a2:
@@ -642,14 +750,17 @@ class DisplayLabel(ImgLabel):
     def dirPolicy(self):
         menu = QMenu(self)
         a1 = menu.addAction('清除区域')
+        menu.addSeparator()
         a2 = menu.addAction('识别此页')
         a3 = menu.addAction('识别全部')
+        menu.addSeparator()
         a4 = menu.addAction('复制结果')
         action = menu.exec_(QCursor.pos())
         pdfwidget = self.getPdfWidget()
         activeuser = pdfwidget.account.active_user()
         if action == a1:
-            self.points.clear()
+            self.clearXYCoords()
+            self.clearMovedInfos()
             self.points.points_signal.emit([])
             self.update()
         elif action == a2:
@@ -696,6 +807,7 @@ class PageState(object):
 
     def __repr__(self):
         return f'PageState<{self.page_index},{self.fake_page_index},{self.rotate},{self.select_state},{self.rect_coords}>'
+
 
 class PreviewLabel(ImgLabel):
 

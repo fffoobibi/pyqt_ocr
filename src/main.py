@@ -48,6 +48,7 @@ class InitDpi(QWidget):
 class MainWidget(QMainWindow, Ui_MainWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.setMouseTracking(True)
         self.setupUi(self)
         self.init()
         self.setActions()
@@ -65,6 +66,7 @@ class MainWidget(QMainWindow, Ui_MainWindow):
     def setActions(self):
         self.action_advanced.triggered.connect(self.dialogSlot)
         self.dialog.radio_signal.connect(self.updateRadio)
+        self.action_config.triggered.connect(self.versionInfo)
         self.statusBar().hide()
 
     def setStyles(self):
@@ -93,6 +95,15 @@ class MainWidget(QMainWindow, Ui_MainWindow):
         self.dialog.update_config(from_config=user.config)
         self.dialog.exec_()
 
+    @slot()
+    def versionInfo(self, flag):
+        msgbox = QMessageBox(self)
+        msgbox.setWindowTitle('信息')
+        msgbox.setWindowIcon(QIcon(':/image/img/newspaper.svg'))
+        msgbox.setStandardButtons(QMessageBox.Ok)
+        msgbox.setText('版本: v1.1.2\n联系: 2836204894@qq.com')
+        msgbox.exec_()
+    
     @slot(signal='radio_signal')
     def updateRadio(self, flag):
         if flag == 0:

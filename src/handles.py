@@ -481,14 +481,16 @@ class OcrHandle(QObject):
     results_signal = pyqtSignal(object)
     error_signal = pyqtSignal()
 
-    def __init__(self, pdf_handle: PdfHandle = None, list_widget=None):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        pdf_handle = kwargs.pop('pdf_handle')
+        list_widget = kwargs.pop('list_widget')
+        super().__init__(*args, **kwargs)
         self.pdf_handle = pdf_handle
         self.list_widget = list_widget
         self.result_handle = ResultsHandle()
         self.latest_result = ['']
 
-    @slot(signal='ocr_signal', sender='self')
+    @slot(signal='ocr_signal')
     def ocr(self, user: User) -> NoReturn:
         platform = user.platform
         if platform == 'b':

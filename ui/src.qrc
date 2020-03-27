@@ -1,5 +1,8 @@
 <RCC>
   <qresource prefix="image">
+    <file>img/copy.svg</file>
+    <file>img/bin.svg</file>
+    <file>img/newspaper.svg</file>
     <file>img/spinner.svg</file>
     <file>img/arrow-next.svg</file>
     <file>img/arrow-pre.svg</file>
