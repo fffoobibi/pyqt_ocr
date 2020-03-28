@@ -8,7 +8,7 @@ from enum import Enum
 from PyQt5.QtWidgets import (QLineEdit, QLabel, QMenu, QAction, QListWidget,
                              QPushButton, QApplication, QTextBrowser, QDialog,
                              QListView, QListWidgetItem, QHBoxLayout, QWidget)
-from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator,
+from PyQt5.QtGui import (QPainter, QCursor, QPen, QColor, QDrag, QIntValidator, QBitmap,
                          QIcon, QFont, QPixmap, QFont, QPainterPath, QDrag,
                          QTransform, QDragEnterEvent, QDropEvent, QMouseEvent, QDragMoveEvent)
 from PyQt5.QtCore import QObject, Qt, pyqtSignal, QPoint, QMimeData, QRectF, QThread, QTime, QSize, QRect
@@ -20,6 +20,22 @@ from fitz import open as pdf_open
 from supports import *
 
 from advancedui import Ui_Dialog
+
+
+class Rounded(object):
+    
+    def setRounded(self):
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        bit = QBitmap(self.size())
+        bit.fill()
+        painter = QPainter()
+        painter.begin(bit)
+        painter.setRenderHint(QPainter.Antialiasing, 0)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(Qt.black)
+        painter.drawRoundedRect(bit.rect(), 10, 10)
+        painter.end()
+        self.setMask(bit)
 
 
 class AdvancedDialog(QDialog, Ui_Dialog):
@@ -510,7 +526,6 @@ class ImgLabel(QLabel):
                     painter.drawRect(x2, y1 - h, w, h)  # 左上方滑动
                     painter.drawText(x2, y2 - 4, msg)
                     painter.fillRect(x2, y1 - h, w, h, self.FILL_COLOR)
-
 
 
 class Actions(Enum):

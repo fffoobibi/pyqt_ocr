@@ -3,22 +3,28 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
-class Widget(QWidget):
+
+class Rounded(object):
+
+    def setRounded(self):
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        bit = QBitmap(self.size())
+        bit.fill()
+        painter = QPainter()
+        painter.begin(bit)
+        painter.setRenderHint(QPainter.Antialiasing, 0)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(Qt.black)
+        painter.drawRoundedRect(bit.rect(), 10, 10)
+        painter.end()
+        self.setMask(bit)
+
+class Widget(QWidget, Rounded):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        p1 = QPoint(10, 10)
-        p2 = QPoint(20, 20)
-        print(p2 - p1)
-        print(p2 + p1)
-        self.rec = QRect(10, 10, 200, 200)
         self.resize(500, 500)
-
-    def paintEvent(self, event):
-        painter= QPainter()
-        painter.begin(self)
-        painter.drawRect(self.rec)
-        painter.end()
-
+        self.setRounded()        
+   
 
 def main():
     app = QApplication(sys.argv)
@@ -27,9 +33,4 @@ def main():
     sys.exit(app.exec_())
 
 if __name__ == '__main__':
-    # main()
-
-    r = QRect(10, 10, 500, 500)
-    r.moveTopLeft(QPoint(200, 200))
-    print(r)
-    print(r.topLeft())
+    main()

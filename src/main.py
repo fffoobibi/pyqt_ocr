@@ -11,7 +11,7 @@ from PyQt5.QtCore import *
 from mainnew import Ui_MainWindow
 from pdfnew import PdfWidget
 from analysis import AnalysisWidget
-from customwidgets import AdvancedDialog
+from customwidgets import AdvancedDialog, Rounded
 from supports import *
 
 G_DPI = 0
